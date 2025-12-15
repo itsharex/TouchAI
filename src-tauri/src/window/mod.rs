@@ -1,0 +1,33 @@
+// Copyright (c) 2025. 千诚. Licensed under GPL v3.
+
+//! 窗口管理模块
+//!
+//! 负责处理窗口相关的操作，包括显示、隐藏、焦点设置等
+
+use tauri::{Manager, WindowEvent};
+
+/// 设置窗口事件监听器
+/// 当窗口失去焦点时自动隐藏窗口
+pub fn setup_window_events(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let main_window = app.get_webview_window("main")
+        .ok_or("Failed to get main window")?;
+
+    let search_window_clone = main_window.clone();
+
+    main_window.on_window_event(move |event| {
+        if let WindowEvent::Focused(false) = event {
+            let _ = search_window_clone.hide();
+        }
+    });
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_module_compilation() {
+        // 简单测试确保模块可以被正确导入和编译
+        assert!(true);
+    }
+}

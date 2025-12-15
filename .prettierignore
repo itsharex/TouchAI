@@ -1,0 +1,44 @@
+# 依赖和构建产物
+node_modules/
+dist/
+build/
+*.min.*
+coverage/
+
+# 配置文件（保持原样）
+*.config.js
+*.config.ts
+vite.config.*
+tsconfig.json
+package.json
+*d.ts
+tsconfig.node.json
+
+# 锁定文件（不应格式化）
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 文档文件
+*.md
+
+# 日志文件
+*.log
+npm-debug.log*
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+tmp/
+temp/
+
+# Tauri后端
+src-tauri/
