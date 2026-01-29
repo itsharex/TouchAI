@@ -2,17 +2,18 @@
  * Copyright (c) 2025. 千诚. Licensed under GPL v3.
  */
 
-@config '@/../tailwind.config.js';
 @import 'tailwindcss';
+@import 'highlight.js/styles/github-dark.css';
+
+@config '@/../tailwind.config.js';
 
 @theme {
     --font-sans:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-/* 全局基础样式 - 使用 Tailwind 的方式 */
+/* 全局基础样式 */
 @layer base {
-    /* CSS 变量定义 - 用于语义化颜色管理，便于未来支持主题切换 */
     :root {
         /* 文本颜色 */
         --color-text-primary: #111827; /* gray-900 - 主要文本 */
@@ -26,12 +27,12 @@
         --color-bg-tertiary: #f3f4f6; /* gray-100 - 辅助背景 */
 
         /* 边框颜色 */
-        --color-border-primary: #e5e7eb; /* gray-200 - 主边框 */
-        --color-border-secondary: #d1d5db; /* gray-300 - 次边框 */
+        --color-border-primary: #e3ded3; /* gray-200 - 主边框 */
+        --color-border-secondary: #edeae3; /* gray-300 - 次边框 */
 
         /* 代码块颜色 */
-        --color-code-bg: #f3f4f6; /* gray-100 - 内联代码背景 */
-        --color-code-text: #111827; /* gray-900 - 内联代码文本 */
+        --color-code-bg: #f1ece1; /* 内联代码背景 */
+        --color-code-text: #691d1d; /* 内联代码文本 */
         --color-code-block-bg: #1f2937; /* gray-800 - 代码块背景 */
         --color-code-block-text: #f9fafb; /* gray-50 - 代码块文本 */
 
@@ -443,6 +444,3 @@
         color: #f9fafb;
     }
 }
-
-/* Highlight.js 主题样式 */
-@import 'highlight.js/styles/github-dark.css';

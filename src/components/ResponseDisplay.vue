@@ -17,16 +17,13 @@
                 <span>Thinking...</span>
             </div>
 
-            <div
-                v-if="reasoning || isThinking"
-                class="reasoning-section mt-4 mb-4 w-full rounded-lg border border-gray-300 bg-gray-100/80 shadow-sm"
-            >
+            <div v-if="reasoning || isThinking" class="reasoning-section mb-4 w-full">
                 <button
-                    class="sticky top-0 z-10 flex w-full items-center gap-2 rounded-t-lg border-b border-gray-300 bg-gray-200/90 px-3 py-2 text-left text-xs font-medium text-gray-600 backdrop-blur-sm transition-colors hover:bg-gray-300/90"
+                    class="flex w-full items-center gap-2 px-1 py-2 text-left text-sm font-normal text-gray-700 transition-colors hover:text-gray-900"
                     @click="toggleReasoning"
                 >
                     <svg
-                        class="h-3.5 w-3.5 transition-transform"
+                        class="h-4 w-4 transition-transform"
                         :class="{ 'rotate-90': isReasoningExpanded }"
                         fill="none"
                         stroke="currentColor"
@@ -40,10 +37,10 @@
                         />
                     </svg>
                     <span v-if="isThinking">思考中</span>
-                    <span v-else>已完成思考（用时 {{ reasoningDuration }}秒）</span>
+                    <span v-else>已思考（用时 {{ reasoningDuration }} 秒）</span>
                     <span
                         v-if="isThinking"
-                        class="ml-auto flex items-center gap-1 text-xs text-gray-500"
+                        class="ml-2 flex items-center gap-1 text-xs text-gray-500"
                     >
                         <div class="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-500"></div>
                     </span>
@@ -51,10 +48,10 @@
                 <div
                     v-show="isReasoningExpanded"
                     ref="reasoningContainer"
-                    class="reasoning-content custom-scrollbar-thin max-h-60 w-full overflow-y-auto rounded-b-lg bg-gray-50 px-3 py-2.5 text-xs text-gray-600"
+                    class="reasoning-content custom-scrollbar-thin mt-2 max-h-60 w-full overflow-y-auto border-l-1 border-gray-300 py-1 pr-2 pl-4 text-sm text-gray-500"
                     @scroll="handleReasoningScroll"
                 >
-                    <div class="prose prose-xs max-w-none" v-html="renderedReasoning"></div>
+                    <div class="prose prose-sm max-w-none" v-html="renderedReasoning"></div>
                 </div>
             </div>
 
@@ -394,7 +391,6 @@
         font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
         background-color: var(--color-code-block-bg);
         color: var(--color-code-block-text);
-        padding: 1em;
         border-radius: 6px;
         overflow-x: auto;
         line-height: 1.6;
@@ -447,7 +443,53 @@
 
     /* Reasoning 内容样式 */
     .reasoning-content {
-        font-family: 'Source Han Serif SC', 'Noto Serif SC', 'Source Serif Pro', 'Georgia', serif;
-        line-height: 2;
+        font-family:
+            'Source Han Sans SC',
+            'Noto Sans SC',
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            sans-serif;
+        line-height: 1.8;
+    }
+
+    .reasoning-content :deep(p) {
+        margin-bottom: 0.75em;
+        color: #6b7280; /* gray-500 */
+    }
+
+    .reasoning-content :deep(ul),
+    .reasoning-content :deep(ol) {
+        padding-left: 1.25em;
+        margin-bottom: 0.75em;
+    }
+
+    .reasoning-content :deep(li) {
+        margin-bottom: 0.5em;
+        color: #6b7280; /* gray-500 */
+    }
+
+    .reasoning-content :deep(strong) {
+        font-weight: 600;
+        color: #6b7280; /* gray-500 */
+    }
+
+    .reasoning-content :deep(code) {
+        font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+        font-size: 0.9em;
+        background-color: #f3f4f6; /* gray-100 */
+        padding: 0.15em 0.35em;
+        border-radius: 3px;
+        color: #6b7280; /* gray-500 */
+    }
+
+    .reasoning-content :deep(h1),
+    .reasoning-content :deep(h2),
+    .reasoning-content :deep(h3),
+    .reasoning-content :deep(h4),
+    .reasoning-content :deep(h5),
+    .reasoning-content :deep(h6) {
+        color: #6b7280; /* gray-500 */
+        font-weight: 600;
     }
 </style>

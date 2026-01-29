@@ -23,7 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-*.db
+*.db*
+nul
 
 *.md
 !README.md

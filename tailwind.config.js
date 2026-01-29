@@ -9,7 +9,7 @@ module.exports = {
       colors: {
         // 背景色
         background: {
-          primary: 'rgba(250,247,247,0.98)',  // 主背景色
+          primary: 'rgba(251, 249, 245, 0.98)',  // 主背景色
         },
         // 主色调 - 蓝色系，用于主要按钮、链接、选中状态
         primary: {
