@@ -16,7 +16,7 @@ export class OpenAiProvider implements AiProvider {
     type = 'openai' as const;
     private client: OpenAI;
 
-    constructor(private config: AiProviderConfig) {
+    constructor(config: AiProviderConfig) {
         this.client = new OpenAI({
             apiKey: config.apiKey,
             baseURL: config.apiEndpoint,
@@ -28,8 +28,6 @@ export class OpenAiProvider implements AiProvider {
         const completion = await this.client.chat.completions.create({
             model: options.model,
             messages: options.messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            max_tokens: options.maxTokens || this.config.maxTokens,
-            temperature: options.temperature ?? this.config.temperature ?? 0.7,
             stream: false,
         });
 
@@ -47,8 +45,6 @@ export class OpenAiProvider implements AiProvider {
         const stream = await this.client.chat.completions.create({
             model: options.model,
             messages: options.messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            max_tokens: options.maxTokens || this.config.maxTokens,
-            temperature: options.temperature ?? this.config.temperature ?? 0.7,
             stream: true,
         });
 

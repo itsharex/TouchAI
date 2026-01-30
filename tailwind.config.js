@@ -9,15 +9,18 @@ module.exports = {
       colors: {
         // 背景色
         background: {
-          primary: 'rgba(251, 249, 245, 0.98)',  // 主背景色
+          primary: 'rgba(251,251,246,0.98)',  // 主背景色 #fbf9f5
         },
-        // 主色调 - 蓝色系，用于主要按钮、链接、选中状态
+        // 主色调 - 暖棕灰色系，与 #fbf9f5 背景协调
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          500: '#3b82f6',  // 主色
-          600: '#2563eb',  // 深色，用于悬停状态
-          700: '#1d4ed8',
+          50: '#f7f5f3',   // 极浅暖灰
+          100: '#ebe7e3',  // 浅暖灰
+          200: '#d9d3cc',  // 中浅暖灰
+          300: '#b8afa5',  // 中暖灰
+          400: '#968b7d',  // 中深暖灰
+          500: '#6b5f54',  // 主色 - 暖棕灰
+          600: '#5a4f45',  // 深色，用于悬停状态
+          700: '#4a4039',  // 更深
         },
         // 次要色 - 紫色系，保留用于未来扩展
         secondary: {
@@ -27,7 +30,7 @@ module.exports = {
           600: '#9333ea',
           700: '#7e22ce',
         },
-        // 成功色 - 绿色系，用于保存按钮、成功状态、开关
+        // 成功色 - 绿色系，用于成功状态
         success: {
           50: '#f0fdf4',
           100: '#dcfce7',
@@ -80,12 +83,6 @@ module.exports = {
           DEFAULT: '#9333ea',
           dark: '#6b21a8',
         },
-        // Ollama 品牌色 - 蓝色系
-        ollama: {
-          light: '#dbeafe',
-          DEFAULT: '#3b82f6',
-          dark: '#1e40af',
-        },
       },
       fontFamily: {
         sans: [
@@ -95,6 +92,11 @@ module.exports = {
           '"PingFang SC"',
           '"Microsoft YaHei"',
           'sans-serif'
+        ],
+        serif: [
+          '"Source Han Serif SC"',
+          '"Noto Serif SC"',
+          'serif'
         ],
       },
     },

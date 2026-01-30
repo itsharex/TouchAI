@@ -4,10 +4,11 @@
 //!
 //! 负责注册和处理全局快捷键
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{
     Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent,
 };
+use crate::window;
 
 /// 注册全局快捷键
 pub fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
@@ -24,20 +25,8 @@ pub fn create_shortcut_handler() -> impl Fn(&AppHandle, &Shortcut, ShortcutEvent
         let alt_space = Shortcut::new(Some(Modifiers::ALT), Code::Space);
         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed && received_shortcut == &alt_space {
             // 忽略切换窗口可见性的错误
-            let _ = toggle_window_visibility(app_handle);
+            let _ = window::toggle_window_visibility(app_handle);
         }
     }
 }
 
-/// 切换主窗口的可见性
-fn toggle_window_visibility(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(window) = app_handle.get_webview_window("main") {
-        if window.is_visible()? {
-            window.hide()?;
-        } else {
-            window.show()?;
-            window.set_focus()?;
-        }
-    }
-    Ok(())
-}

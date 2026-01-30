@@ -1,16 +1,25 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
+import katex from '@vscode/markdown-it-katex';
 import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
+import abbr from 'markdown-it-abbr';
+import deflist from 'markdown-it-deflist';
+import footnote from 'markdown-it-footnote';
+import ins from 'markdown-it-ins';
+import mark from 'markdown-it-mark';
+import sub from 'markdown-it-sub';
+import sup from 'markdown-it-sup';
+import taskLists from 'markdown-it-task-lists';
 
 /**
- * 配置 Markdown 渲染器，支持代码高亮
+ * 配置 Markdown 渲染器，支持代码高亮和数学公式
  */
 export function createMarkdownRenderer(): MarkdownIt {
     const md = new MarkdownIt({
         html: true,
         linkify: true,
-        typographer: true,
+        typographer: false, // 禁用排版转换，避免干扰公式
         highlight: (str: string, lang: string) => {
             // 如果指定了语言且 highlight.js 支持，则高亮
             if (lang && hljs.getLanguage(lang)) {
@@ -77,6 +86,17 @@ export function createMarkdownRenderer(): MarkdownIt {
             </div>`;
         },
     });
+
+    // 启用扩展插件
+    md.use(katex); // 数学公式 $$block$$ (块级公式)
+    md.use(footnote); // 脚注支持 [^1]
+    md.use(mark); // 高亮文本 ==marked==
+    md.use(sub); // 下标 H~2~O
+    md.use(sup); // 上标 x^2^
+    md.use(abbr); // 缩写定义
+    md.use(deflist); // 定义列表
+    md.use(ins); // 插入文本 ++inserted++
+    md.use(taskLists, { enabled: true }); // 任务列表 - [ ] task
 
     return md;
 }

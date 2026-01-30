@@ -16,7 +16,13 @@ export default defineConfig(async () => ({
       '@utils': path.resolve(__dirname, './src/utils'),
       '@types': path.resolve(__dirname, './src/types'),
       '@styles': path.resolve(__dirname, './src/styles'),
+      '@services': path.resolve(__dirname, './src/services'),
+      '@composables': path.resolve(__dirname, './src/composables'),
+      '@database': path.resolve(__dirname, './src/database'),
     },
+  },
+  build: {
+    assetsInlineLimit: 8192, // 8kb - 小于此大小的资源将被内联为 base64
   },
   clearScreen: false,
   server: {

@@ -108,7 +108,7 @@ export interface SettingsTable {
 export interface ProvidersTable {
     id: Generated<number>;
     name: string;
-    type: 'openai' | 'claude';
+    type: 'openai' | 'anthropic';
     api_endpoint: string;
     api_key: string | null;
     logo: string;
@@ -127,8 +127,6 @@ export interface ModelsTable {
     name: string;
     model_id: string;
     is_default: number;
-    max_tokens: number | null;
-    temperature: number | null;
     last_used_at: string | null;
     created_at: Generated<string>;
     updated_at: Generated<string>;

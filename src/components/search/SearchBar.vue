@@ -1,10 +1,14 @@
+<!--
+  - Copyright (c) 2026. Qian Cheng. Licensed under GPL v3
+  -->
+
 <template>
     <div class="mx-auto h-[56px] w-full select-none" @click="focus">
         <div
             class="bg-background-primary relative flex h-full items-center gap-5 rounded-lg border border-gray-300 p-3 backdrop-blur-sm backdrop-blur-xl transition-all duration-250 ease-in-out"
         >
             <div class="flex items-center justify-center">
-                <img src="@assets/logo_word.svg" alt="search" class="h-5 w-15 select-none" />
+                <img :src="logoWord" alt="search" class="h-5 w-15 select-none" />
             </div>
             <input
                 ref="searchInput"
@@ -26,7 +30,7 @@
                 data-tauri-drag-region="false"
                 @click="clearSearch"
             >
-                <img src="@assets/icons/clear.svg" alt="clear" class="h-5 w-5" />
+                <SvgIcon name="clear" class="h-5 w-5" />
             </div>
             <div
                 class="ml-2 flex cursor-pointer items-center text-gray-400 transition-colors duration-200 hover:text-gray-600"
@@ -34,26 +38,7 @@
                 title="设置"
                 @click="openSettings"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    />
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                </svg>
+                <SvgIcon name="settings" class="h-5 w-5" />
             </div>
         </div>
     </div>
@@ -62,6 +47,8 @@
 <script setup lang="ts">
     // Copyright (c) 2025. 千诚. Licensed under GPL v3.
 
+    import logoWord from '@assets/logo_word.svg';
+    import SvgIcon from '@components/common/SvgIcon.vue';
     import { invoke } from '@tauri-apps/api/core';
     import { ref } from 'vue';
 

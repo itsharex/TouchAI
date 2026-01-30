@@ -39,19 +39,6 @@ function isInternalLink(url: string): boolean {
 }
 
 /**
- * 在外部浏览器中打开链接
- * @param url 要打开的 URL
- */
-async function openInBrowser(url: string): Promise<void> {
-    try {
-        await openUrl(url);
-        console.log(`[LinkInterceptor] 已在外部浏览器打开: ${url}`);
-    } catch (error) {
-        console.error(`[LinkInterceptor] 打开外部链接失败: ${url}`, error);
-    }
-}
-
-/**
  * 处理链接点击事件
  * @param event 点击事件
  */
@@ -86,7 +73,7 @@ function handleLinkClick(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
 
-    openInBrowser(href);
+    openUrl(href).then(() => {});
 }
 
 /**
@@ -100,7 +87,7 @@ function interceptWindowOpen(): void {
 
         if (!isInternalLink(urlString)) {
             // 外部链接使用系统浏览器打开
-            openInBrowser(urlString);
+            openUrl(urlString).then(() => {});
             return null;
         }
 
@@ -120,12 +107,4 @@ export function setupLinkInterceptor(): void {
     interceptWindowOpen();
 
     console.log('[LinkInterceptor] 链接拦截器已启用');
-}
-
-/**
- * 移除链接拦截器
- */
-export function removeLinkInterceptor(): void {
-    document.removeEventListener('click', handleLinkClick, true);
-    console.log('[LinkInterceptor] 链接拦截器已移除');
 }

@@ -2,7 +2,6 @@
 
 /**
  * AI 服务类型定义
- * 定义 AI 提供商实现的契约
  */
 
 export interface AiMessage {
@@ -13,8 +12,6 @@ export interface AiMessage {
 export interface AiRequestOptions {
     model: string;
     messages: AiMessage[];
-    maxTokens?: number;
-    temperature?: number;
     stream?: boolean;
 }
 
@@ -37,7 +34,7 @@ export interface ModelInfo {
 
 export interface AiProvider {
     name: string;
-    type: 'openai' | 'claude' | 'ollama';
+    type: 'openai' | 'anthropic';
 
     /**
      * 发送请求到 AI 提供商
@@ -63,6 +60,4 @@ export interface AiProvider {
 export interface AiProviderConfig {
     apiEndpoint: string;
     apiKey?: string;
-    maxTokens?: number;
-    temperature?: number;
 }

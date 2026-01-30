@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) 2026. Qian Cheng. Licensed under GPL v3
+  -->
+
 <template>
     <div class="relative w-full">
         <div
@@ -22,20 +26,14 @@
                     class="flex w-full items-center gap-2 px-1 py-2 text-left text-sm font-normal text-gray-700 transition-colors hover:text-gray-900"
                     @click="toggleReasoning"
                 >
-                    <svg
-                        class="h-4 w-4 transition-transform"
-                        :class="{ 'rotate-90': isReasoningExpanded }"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M9 5l7 7-7 7"
-                        />
-                    </svg>
+                    <SvgIcon
+                        name="chevron-right"
+                        :class="
+                            isReasoningExpanded
+                                ? 'h-4 w-4 rotate-90 transition-transform'
+                                : 'h-4 w-4 transition-transform'
+                        "
+                    />
                     <span v-if="isThinking">思考中</span>
                     <span v-else>已思考（用时 {{ reasoningDuration }} 秒）</span>
                     <span
@@ -83,28 +81,16 @@
                 class="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl"
                 @click="scrollToBottom"
             >
-                <svg
-                    class="h-5 w-5 text-gray-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                    />
-                </svg>
+                <SvgIcon name="arrow-down" class="h-5 w-5 text-gray-600" />
             </button>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
+    import SvgIcon from '@components/common/SvgIcon.vue';
+    import { renderMarkdown } from '@utils/markdown.ts';
     import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-
-    import { renderMarkdown } from '@/utils/markdown';
 
     interface Props {
         content: string;
@@ -258,11 +244,14 @@
     watch(
         () => props.content,
         (newContent, oldContent) => {
-            // 内容被清空时（新请求开始前），重置自动滚动状态
+            // 内容被清空时（新请求开始前），重置自动滚动状态和计时器
             if (!newContent && oldContent) {
                 isAutoScrollEnabled.value = true;
                 isReasoningAutoScrollEnabled.value = true;
                 showScrollToBottom.value = false;
+                // 重置 reasoning 计时器
+                reasoningStartTime.value = null;
+                reasoningDuration.value = 0;
             }
 
             // 新请求开始时（从无内容到有内容），确保自动滚动已启用
@@ -351,7 +340,26 @@
         outline: none;
     }
 
+    /* Markdown 内容的颜色变量和基础样式 */
     .response-text {
+        /* 文本颜色 */
+        --color-text-primary: #111827; /* gray-900 */
+        --color-text-secondary: #4b5563; /* gray-600 */
+
+        /* 边框颜色 */
+        --color-border-primary: #e5e7eb; /* gray-200 */
+
+        /* 代码块颜色 */
+        --color-code-bg: #f1ece1;
+        --color-code-text: #691d1d;
+        --color-code-block-bg: #1f2937; /* gray-800 */
+        --color-code-block-text: #f9fafb; /* gray-50 */
+
+        /* 链接颜色 */
+        --color-link: #3b82f6; /* info-500 */
+        --color-link-hover: #2563eb; /* info-600 */
+
+        /* 基础样式 */
         font-family: 'Source Han Serif SC', 'Noto Serif SC', 'Source Serif Pro', 'Georgia', serif;
         font-size: 15px;
         line-height: 1.8;

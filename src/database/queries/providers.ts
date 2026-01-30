@@ -6,11 +6,6 @@ import { db } from '../index';
 import type { NewProvider, Provider, ProviderUpdate } from '../schema';
 
 /**
- * 查找所有服务商
- */
-export const findAllProviders = () => db.getKysely().selectFrom('providers').selectAll().execute();
-
-/**
  * 查找所有服务商，按优先级排序
  * 排序规则：
  * 1. 启用的服务商排在前面
@@ -162,16 +157,4 @@ export const deleteProvider = async (id: number): Promise<boolean> => {
         .executeTakeFirst();
 
     return Number(result.numDeletedRows) > 0;
-};
-
-/**
- * 统计服务商数量
- */
-export const countProviders = async (): Promise<number> => {
-    const result = await db
-        .getKysely()
-        .selectFrom('providers')
-        .select((eb) => eb.fn.countAll().as('count'))
-        .executeTakeFirst();
-    return Number(result?.count || 0);
 };

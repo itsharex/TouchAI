@@ -13,14 +13,14 @@ export function useWindowResize() {
         const newHeight = Math.ceil(Math.min(pageHeight, MAX_WINDOW_HEIGHT));
 
         if (newHeight !== currentHeight.value) {
-            await invoke('resize_window_for_response', { height: newHeight });
+            await invoke('resize_search_window', { height: newHeight });
             currentHeight.value = newHeight;
         }
     }
 
     async function resetToSearchBar() {
         const SEARCH_BAR_HEIGHT = 60;
-        await invoke('resize_window_for_response', { height: SEARCH_BAR_HEIGHT });
+        await invoke('resize_search_window', { height: SEARCH_BAR_HEIGHT });
         currentHeight.value = SEARCH_BAR_HEIGHT;
     }
 

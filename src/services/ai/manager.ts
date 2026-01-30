@@ -4,10 +4,10 @@ import {
     findMessagesBySessionId,
     findModelsWithProvider,
     updateModelLastUsed,
-} from '@/database/queries';
-import type { Model } from '@/database/schema';
+} from '@database/queries';
+import type { Model } from '@database/schema';
 
-import { ClaudeProvider } from './providers/claude';
+import { AnthropicProvider } from './providers/anthropic.ts';
 import { OpenAiProvider } from './providers/openai';
 import type { AiMessage, AiProvider, AiResponse, AiStreamChunk } from './types';
 
@@ -49,6 +49,30 @@ export class AiServiceManager {
     }
 
     /**
+     * 内部方法：创建提供商实例
+     */
+    private _createProvider(
+        providerType: string,
+        apiEndpoint: string,
+        apiKey?: string | null
+    ): AiProvider {
+        const normalizedEndpoint = this.normalizeEndpoint(apiEndpoint, providerType);
+        const config = {
+            apiEndpoint: normalizedEndpoint,
+            apiKey: apiKey || undefined,
+        };
+
+        switch (providerType) {
+            case 'openai':
+                return new OpenAiProvider(config);
+            case 'anthropic':
+                return new AnthropicProvider(config);
+            default:
+                throw new Error(`Unknown provider type: ${providerType}`);
+        }
+    }
+
+    /**
      * 获取或创建服务商的提供商实例
      */
     private getProvider(
@@ -57,26 +81,14 @@ export class AiServiceManager {
         apiEndpoint: string,
         apiKey?: string | null
     ): AiProvider {
-        // 规范化端点
-        const normalizedEndpoint = this.normalizeEndpoint(apiEndpoint, providerType);
-        console.log(normalizedEndpoint);
-        const config = {
-            apiEndpoint: normalizedEndpoint,
-            apiKey: apiKey || undefined,
-        };
-
-        let provider: AiProvider;
-        switch (providerType) {
-            case 'openai':
-                provider = new OpenAiProvider(config);
-                break;
-            case 'claude':
-                provider = new ClaudeProvider(config);
-                break;
-            default:
-                throw new Error(`Unknown provider type: ${providerType}`);
+        // 检查缓存
+        const cached = this.providers.get(providerId);
+        if (cached) {
+            return cached;
         }
 
+        // 创建新实例
+        const provider = this._createProvider(providerType, apiEndpoint, apiKey);
         this.providers.set(providerId, provider);
         return provider;
     }
@@ -89,21 +101,7 @@ export class AiServiceManager {
         apiEndpoint: string,
         apiKey?: string | null
     ): AiProvider {
-        // 规范化端点
-        const normalizedEndpoint = this.normalizeEndpoint(apiEndpoint, providerType);
-        const config = {
-            apiEndpoint: normalizedEndpoint,
-            apiKey: apiKey || undefined,
-        };
-
-        switch (providerType) {
-            case 'openai':
-                return new OpenAiProvider(config);
-            case 'claude':
-                return new ClaudeProvider(config);
-            default:
-                throw new Error(`Unknown provider type: ${providerType}`);
-        }
+        return this._createProvider(providerType, apiEndpoint, apiKey);
     }
 
     /**
@@ -138,8 +136,6 @@ export class AiServiceManager {
         const response = await provider.request({
             model: activeModel.model_id,
             messages,
-            maxTokens: activeModel.max_tokens || undefined,
-            temperature: activeModel.temperature || undefined,
         });
 
         await updateModelLastUsed(activeModel.id);
@@ -171,8 +167,6 @@ export class AiServiceManager {
         for await (const chunk of provider.stream({
             model: activeModel.model_id,
             messages,
-            maxTokens: activeModel.max_tokens || undefined,
-            temperature: activeModel.temperature || undefined,
         })) {
             yield { chunk, model: activeModel };
         }
@@ -202,7 +196,7 @@ export class AiServiceManager {
     }
 
     /**
-     * 规范化端点，自动拼接 /v1（如果需要）
+     * 规范化地址，自动拼接 /v1（如果需要）
      */
     private normalizeEndpoint(endpoint: string, type: string): string {
         // 移除末尾的斜杠
@@ -217,7 +211,7 @@ export class AiServiceManager {
         switch (type) {
             case 'openai':
                 return `${endpoint}/v1`;
-            case 'claude':
+            case 'anthropic':
                 return `${endpoint}`;
             default:
                 return endpoint;

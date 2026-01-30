@@ -2,11 +2,10 @@
 
 import '@styles/tailwind.css';
 
+import { useAlert } from '@composables/useAlert';
+import { db } from '@database';
 import { setupLinkInterceptor } from '@utils/linkInterceptor';
 import { createApp } from 'vue';
-
-import { useAlert } from '@/composables/useAlert';
-import { db } from '@/database';
 
 import App from './App.vue';
 import router from './router';

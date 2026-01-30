@@ -92,8 +92,6 @@ export const init001: Migration = {
                 .addColumn('name', 'text', (col) => col.notNull())
                 .addColumn('model_id', 'text', (col) => col.notNull())
                 .addColumn('is_default', 'integer', (col) => col.notNull().defaultTo(0))
-                .addColumn('max_tokens', 'integer')
-                .addColumn('temperature', 'real')
                 .addColumn('last_used_at', 'text')
         ).execute();
         await createUpdateTrigger(kysely, 'models');
@@ -150,10 +148,10 @@ export const init001: Migration = {
                 is_builtin: 1,
             },
             {
-                name: 'Claude',
-                type: 'claude',
+                name: 'Anthropic',
+                type: 'anthropic',
                 api_endpoint: 'https://api.anthropic.com',
-                logo: 'claude.png',
+                logo: 'anthropic.png',
                 enabled: 0,
                 is_builtin: 1,
             },
@@ -166,10 +164,10 @@ export const init001: Migration = {
                 is_builtin: 1,
             },
             {
-                name: 'Doubao',
+                name: '火山引擎',
                 type: 'openai',
                 api_endpoint: 'https://ark.cn-beijing.volces.com/api/v3',
-                logo: 'doubao.png',
+                logo: 'volcengine.png',
                 enabled: 0,
                 is_builtin: 1,
             },
@@ -190,18 +188,10 @@ export const init001: Migration = {
                 is_builtin: 1,
             },
             {
-                name: 'Hunyuan',
+                name: '腾讯混元',
                 type: 'openai',
                 api_endpoint: 'https://api.hunyuan.cloud.tencent.com',
                 logo: 'hunyuan.png',
-                enabled: 0,
-                is_builtin: 1,
-            },
-            {
-                name: 'Llama',
-                type: 'openai',
-                api_endpoint: 'https://api.together.xyz',
-                logo: 'llama.png',
                 enabled: 0,
                 is_builtin: 1,
             },
@@ -214,7 +204,7 @@ export const init001: Migration = {
                 is_builtin: 1,
             },
             {
-                name: 'Moonshot',
+                name: '月之暗面',
                 type: 'openai',
                 api_endpoint: 'https://api.moonshot.cn',
                 logo: 'moonshot.png',
@@ -222,15 +212,15 @@ export const init001: Migration = {
                 is_builtin: 1,
             },
             {
-                name: 'Qwen',
+                name: '阿里云百炼',
                 type: 'openai',
                 api_endpoint: 'https://dashscope.aliyuncs.com/compatible-mode',
-                logo: 'qwen.png',
+                logo: 'bailian.png',
                 enabled: 0,
                 is_builtin: 1,
             },
             {
-                name: 'Zhipu',
+                name: '智谱',
                 type: 'openai',
                 api_endpoint: 'https://open.bigmodel.cn/api/paas',
                 logo: 'zhipu.png',

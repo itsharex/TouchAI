@@ -1,17 +1,16 @@
 <script setup lang="ts">
     // Copyright (c) 2025. Qian Cheng. Licensed under GPL v3.
 
+    import ResponsePanel from '@components/search/ResponsePanel.vue';
+    import SearchBar from '@components/search/SearchBar.vue';
+    import { useAiRequest } from '@composables/useAiRequest';
+    import { useWindowResize } from '@composables/useWindowResize';
     import { getCurrentWindow } from '@tauri-apps/api/window';
-    import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-
-    import ResponseDisplay from '@/components/ResponseDisplay.vue';
-    import SearchBar from '@/components/SearchBar.vue';
-    import { useAiRequest } from '@/composables/useAiRequest';
-    import { useWindowResize } from '@/composables/useWindowResize';
+    import { nextTick, onMounted, ref } from 'vue';
 
     const searchQuery = ref('');
     const searchBar = ref<InstanceType<typeof SearchBar>>();
-    const responseDisplay = ref<InstanceType<typeof ResponseDisplay>>();
+    const responseDisplay = ref<InstanceType<typeof ResponsePanel>>();
     const pageContainer = ref<HTMLElement | null>(null);
     let resizeObserver: ResizeObserver | null = null;
 
@@ -57,7 +56,7 @@
         }
     }
 
-    // 全局键盘事件监听
+    // 键盘事件监听
     async function handleKeyDown(event: KeyboardEvent) {
         const now = Date.now();
 
@@ -73,14 +72,9 @@
             event.preventDefault();
             event.stopPropagation();
 
-            // 如果没有输入内容，隐藏窗口
+            // 如果没有输入内容并且也没有结果，即空窗口，那么隐藏窗口
             if (!searchQuery.value.trim() && !hasResponse.value) {
-                try {
-                    const appWindow = getCurrentWindow();
-                    await appWindow.hide();
-                } catch (error) {
-                    console.error('[SearchView] Failed to hide window:', error);
-                }
+                await getCurrentWindow().hide();
                 return;
             }
 
@@ -109,54 +103,42 @@
         }
     }
 
-    onMounted(async () => {
-        await nextTick();
-        if (searchBar.value) {
-            await searchBar.value.focus();
-        }
+    function initPageHeightChangeListener() {
+        resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const height = entry.borderBoxSize?.[0]?.blockSize ?? entry.target.clientHeight;
+                resizeForResponse(height).catch((error) => {
+                    console.error('[SearchView] Failed to resize window:', error);
+                });
+            }
+        });
 
-        const appWindow = getCurrentWindow();
+        resizeObserver.observe(pageContainer.value as HTMLElement);
 
-        await appWindow.listen('tauri://focus', async () => {
+        // 初始触发一次
+        nextTick(() => {
+            resizeForResponse((pageContainer.value as HTMLElement).clientHeight).catch((error) => {
+                console.error('[SearchView] Failed to resize window:', error);
+            });
+        });
+    }
+
+    function initFocusListener() {
+        getCurrentWindow().listen('tauri://focus', async () => {
             await nextTick();
             searchBar.value?.focus();
         });
+    }
+
+    onMounted(async () => {
+        // 初始化窗口获得焦点监听
+        initFocusListener();
 
         // 监听整个页面容器的高度变化
-        if (pageContainer.value) {
-            resizeObserver = new ResizeObserver((entries) => {
-                for (const entry of entries) {
-                    const height = entry.borderBoxSize?.[0]?.blockSize ?? entry.target.clientHeight;
-                    resizeForResponse(height).catch((error) => {
-                        console.error('[SearchView] Failed to resize window:', error);
-                    });
-                }
-            });
-
-            resizeObserver.observe(pageContainer.value);
-
-            // 初始触发一次
-            await nextTick(() => {
-                if (pageContainer.value) {
-                    resizeForResponse(pageContainer.value.clientHeight).catch((error) => {
-                        console.error('[SearchView] Failed to resize window:', error);
-                    });
-                }
-            });
-        }
+        initPageHeightChangeListener();
 
         // 添加全局键盘事件监听
         window.addEventListener('keydown', handleKeyDown);
-    });
-
-    onBeforeUnmount(() => {
-        if (resizeObserver) {
-            resizeObserver.disconnect();
-            resizeObserver = null;
-        }
-
-        // 移除键盘事件监听
-        window.removeEventListener('keydown', handleKeyDown);
     });
 </script>
 
@@ -172,7 +154,7 @@
             @submit="handleSubmit"
             @clear="handleClear"
         />
-        <ResponseDisplay
+        <ResponsePanel
             v-if="hasResponse || isLoading"
             ref="responseDisplay"
             :content="response"

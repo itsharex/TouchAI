@@ -1,10 +1,9 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
+import { createAiRequest, updateAiRequest } from '@database/queries';
+import type { AiRequest } from '@database/schema';
+import { aiService } from '@services/ai/manager';
 import { computed, ref } from 'vue';
-
-import { createAiRequest, updateAiRequest } from '@/database/queries';
-import type { AiRequest } from '@/database/schema';
-import { aiService } from '@/services/ai/manager';
 
 export interface UseAiRequestOptions {
     sessionId?: number;

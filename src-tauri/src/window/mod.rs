@@ -4,7 +4,7 @@
 //!
 //! 负责处理窗口相关的操作，包括显示、隐藏、焦点设置等
 
-use tauri::{Manager, WindowEvent};
+use tauri::{AppHandle, Manager, WindowEvent};
 
 /// 设置窗口事件监听器
 /// 当窗口失去焦点时自动隐藏窗口（保持当前大小）
@@ -17,9 +17,43 @@ pub fn setup_window_events(_app: &mut tauri::App) -> Result<(), Box<dyn std::err
 
     main_window.on_window_event(move |event| {
         if let WindowEvent::Focused(false) = event {
-            // 只隐藏窗口，不重置大小
             let _ = search_window_clone.hide();
         }
     });
+    Ok(())
+}
+
+/**
+ * 动态调整窗口大小
+ */
+#[tauri::command]
+pub async fn resize_search_window(app: AppHandle, height: u32) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or("Failed to get main window")?;
+
+    // 使用 LogicalSize 而不是 PhysicalSize，以正确处理 DPI 缩放
+    window
+        .set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: 750.0, // 固定
+            height: height as f64,
+        }))
+        .map_err(|e| e.to_string())?;
+
+    // 重新居中窗口
+    window.center().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+/// 切换主窗口的可见性
+pub fn toggle_window_visibility(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(window) = app_handle.get_webview_window("main") {
+        if window.is_visible()? {
+            window.hide()?;
+        } else {
+            window.show()?;
+            window.set_focus()?;
+        }
+    }
     Ok(())
 }

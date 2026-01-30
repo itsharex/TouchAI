@@ -1,9 +1,8 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
+import AlertMessage from '@components/common/AlertMessage.vue';
 import type { ComponentPublicInstance } from 'vue';
 import { createApp } from 'vue';
-
-import AlertMessage from '@/components/AlertMessage.vue';
 
 interface AlertInstance {
     success: (message: string, duration?: number) => void;
@@ -41,13 +40,4 @@ export const useAlert = () => {
         warning: (message: string, duration?: number) => alertInstance!.warning(message, duration),
         info: (message: string, duration?: number) => alertInstance!.info(message, duration),
     };
-};
-
-// 清理函数（可选，用于应用卸载时）
-export const destroyAlertSystem = () => {
-    if (containerElement && containerElement.parentNode) {
-        containerElement.parentNode.removeChild(containerElement);
-        containerElement = null;
-        alertInstance = null;
-    }
 };

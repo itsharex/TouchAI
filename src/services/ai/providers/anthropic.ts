@@ -11,12 +11,12 @@ import type {
     ModelInfo,
 } from '../types';
 
-export class ClaudeProvider implements AiProvider {
-    name = 'Claude';
-    type = 'claude' as const;
+export class AnthropicProvider implements AiProvider {
+    name = 'Anthropic';
+    type = 'anthropic' as const;
     private client: Anthropic;
 
-    constructor(private config: AiProviderConfig) {
+    constructor(config: AiProviderConfig) {
         this.client = new Anthropic({
             apiKey: config.apiKey,
             baseURL: config.apiEndpoint,
@@ -28,8 +28,7 @@ export class ClaudeProvider implements AiProvider {
         const message = await this.client.messages.create({
             model: options.model,
             messages: options.messages as Anthropic.MessageParam[],
-            max_tokens: options.maxTokens || this.config.maxTokens || 4096,
-            temperature: options.temperature ?? this.config.temperature ?? 0.7,
+            max_tokens: 4096,
             stream: false,
         });
 
@@ -47,18 +46,18 @@ export class ClaudeProvider implements AiProvider {
         const stream = await this.client.messages.create({
             model: options.model,
             messages: options.messages as Anthropic.MessageParam[],
-            max_tokens: options.maxTokens || this.config.maxTokens || 4096,
-            temperature: options.temperature ?? this.config.temperature ?? 0.7,
+            max_tokens: 4096,
             stream: true,
         });
 
         for await (const event of stream) {
-            // 处理 thinking 内容块（extended thinking）
+            // 处理 thinking 内容块
             if (event.type === 'content_block_start' && event.content_block.type === 'thinking') {
                 // thinking 块开始，不需要特殊处理
                 continue;
             }
 
+            // 处理 delta 内容块
             if (event.type === 'content_block_delta') {
                 if (event.delta.type === 'thinking_delta') {
                     // 推理内容流式输出
@@ -76,11 +75,7 @@ export class ClaudeProvider implements AiProvider {
 
     async testConnection(): Promise<boolean> {
         try {
-            await this.client.messages.create({
-                model: 'claude-3-haiku-20240307',
-                messages: [{ role: 'user', content: 'test' }],
-                max_tokens: 1,
-            });
+            await this.client.models.list();
             return true;
         } catch {
             return false;

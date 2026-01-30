@@ -63,6 +63,9 @@ class TauriSqlConnection implements DatabaseConnection {
     constructor(db: Database) {
         this.db = db;
     }
+    streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {
+        throw new Error('Method not implemented.');
+    }
 
     async executeQuery<O>(compiledQuery: {
         sql: string;
@@ -90,11 +93,6 @@ class TauriSqlConnection implements DatabaseConnection {
             console.error('Query execution error:', error);
             throw error;
         }
-    }
-
-    // eslint-disable-next-line require-yield
-    async *streamQuery<O>(): AsyncIterableIterator<QueryResult<O>> {
-        throw new Error('Streaming is not supported by Tauri SQL plugin');
     }
 }
 
