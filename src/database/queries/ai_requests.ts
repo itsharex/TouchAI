@@ -118,3 +118,12 @@ export const countAiRequests = async (): Promise<number> => {
         .executeTakeFirst();
     return Number(result?.count || 0);
 };
+
+/**
+ * 删除所有 AI 请求
+ */
+export const deleteAllAiRequests = async (): Promise<number> => {
+    const result = await db.getKysely().deleteFrom('ai_requests').executeTakeFirst();
+
+    return Number(result.numDeletedRows);
+};

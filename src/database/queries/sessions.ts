@@ -136,3 +136,12 @@ export const sessionExists = async (id: number): Promise<boolean> => {
 
     return result !== undefined;
 };
+
+/**
+ * 删除所有会话
+ */
+export const deleteAllSessions = async (): Promise<number> => {
+    const result = await db.getKysely().deleteFrom('sessions').executeTakeFirst();
+
+    return Number(result.numDeletedRows);
+};

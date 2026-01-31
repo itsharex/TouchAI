@@ -33,13 +33,32 @@
 
     async function handleSubmit(query: string) {
         reset();
-        await sendRequest(query);
+
+        // Get selected model from SearchBar
+        const selectedModelId = searchBar.value?.selectedModelId;
+
+        // Send request with optional model override
+        await sendRequest(query, selectedModelId || undefined);
     }
 
     // 处理清空事件（点击清除按钮）
     function handleClear() {
         searchQuery.value = '';
         reset();
+    }
+
+    // 处理下拉框状态变化
+    async function handleDropdownStateChange(isOpen: boolean) {
+        if (isOpen) {
+            // 下拉框打开时，扩展窗口高度以容纳下拉框
+            // 搜索框高度 + 下拉框最大高度 + 间距
+            await resizeForResponse(56 + 384 + 40); // 56px searchbar + 384px dropdown (max-h-96) + 40px padding
+        } else {
+            // 下拉框关闭时，恢复原始高度
+            if (!hasResponse.value) {
+                await resizeForResponse(56 + 40); // 只有搜索框
+            }
+        }
     }
 
     // 清空输入框和回复
@@ -71,6 +90,12 @@
         if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
+
+            // 如果输入为空且有选择模型，取消选择模型
+            if (!searchQuery.value.trim() && searchBar.value?.selectedModelId) {
+                searchBar.value?.clearSelectedModel();
+                return;
+            }
 
             // 如果没有输入内容并且也没有结果，即空窗口，那么隐藏窗口
             if (!searchQuery.value.trim() && !hasResponse.value) {
@@ -153,6 +178,7 @@
             @search="handleSearch"
             @submit="handleSubmit"
             @clear="handleClear"
+            @dropdown-state-change="handleDropdownStateChange"
         />
         <ResponsePanel
             v-if="hasResponse || isLoading"

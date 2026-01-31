@@ -4,10 +4,16 @@
     import ConfirmDialog from '@components/common/ConfirmDialog.vue';
     import SvgIcon from '@components/common/SvgIcon.vue';
     import TitleBar from '@components/common/TitleBar.vue';
+    import AboutView from '@components/settings/AboutView.vue';
     import AddProviderDialog from '@components/settings/AddProviderDialog.vue';
     import BadgedLogo from '@components/settings/BadgedLogo.vue';
+    import DataManagement from '@components/settings/DataManagement.vue';
     import EditProviderDialog from '@components/settings/EditProviderDialog.vue';
+    import GeneralSettings from '@components/settings/GeneralSettings.vue';
     import ModelList from '@components/settings/ModelList.vue';
+    import NavigationSidebar, {
+        type NavigationSection,
+    } from '@components/settings/NavigationSidebar.vue';
     import ProviderConfig from '@components/settings/ProviderConfig.vue';
     import ProviderContextMenu from '@components/settings/ProviderContextMenu.vue';
     import ProviderList from '@components/settings/ProviderList.vue';
@@ -32,6 +38,9 @@
 
     const alert = useAlert();
     const { confirmState, handleConfirm, handleCancel } = useConfirm();
+
+    // Navigation state
+    const activeSection = ref<NavigationSection>('general');
 
     const providers = ref<Provider[]>([]);
     const models = ref<Model[]>([]);
@@ -417,6 +426,10 @@
     onMounted(() => {
         loadData();
     });
+
+    const handleNavigate = (section: NavigationSection) => {
+        activeSection.value = section;
+    };
 </script>
 
 <template>
@@ -428,6 +441,9 @@
         <TitleBar title="设置" />
 
         <div class="flex flex-1 overflow-hidden">
+            <!-- Navigation Sidebar -->
+            <NavigationSidebar :active-section="activeSection" @navigate="handleNavigate" />
+
             <!-- 页面初始化loading -->
             <div v-if="loading" class="flex flex-1 items-center justify-center">
                 <div
@@ -451,7 +467,9 @@
 
             <!-- 正式内容 -->
             <template v-else>
+                <!-- Provider List (only for AI services) -->
                 <ProviderList
+                    v-if="activeSection === 'ai-services'"
                     :providers="providers"
                     :selected-provider-id="selectedProviderId"
                     :default-model-provider-ids="defaultModelProviderIds"
@@ -462,61 +480,76 @@
                     @context-menu="handleProviderContextMenu"
                 />
 
-                <div v-if="selectedProvider" class="custom-scrollbar flex-1 overflow-y-auto p-6">
-                    <div class="mx-auto max-w-4xl space-y-6">
-                        <div class="rounded-lg border border-gray-200 bg-white p-6">
-                            <div class="flex items-center gap-4">
-                                <BadgedLogo
-                                    :logo="selectedProvider.logo"
-                                    :name="selectedProvider.name"
-                                    size="large"
-                                    :show-badge="selectedProvider.is_builtin === 1"
-                                />
+                <!-- Content Area -->
+                <div class="custom-scrollbar flex-1 overflow-y-auto">
+                    <!-- General Settings -->
+                    <GeneralSettings v-if="activeSection === 'general'" />
 
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <h2 class="font-serif text-xl font-semibold text-gray-900">
-                                            {{ selectedProvider.name }}
-                                        </h2>
-                                        <span
-                                            class="bg-primary-50 text-primary-600 rounded-full px-2 py-0.5 text-xs font-medium"
-                                        >
-                                            {{
-                                                selectedProvider.type === 'openai'
-                                                    ? 'OpenAI'
-                                                    : 'Anthropic'
-                                            }}
-                                        </span>
+                    <!-- Data Management -->
+                    <DataManagement v-if="activeSection === 'data-management'" />
+
+                    <!-- About -->
+                    <AboutView v-if="activeSection === 'about'" />
+
+                    <!-- AI Services Content -->
+                    <div v-if="activeSection === 'ai-services' && selectedProvider" class="p-6">
+                        <div class="mx-auto max-w-4xl space-y-6">
+                            <div class="rounded-lg border border-gray-200 bg-white p-6">
+                                <div class="flex items-center gap-4">
+                                    <BadgedLogo
+                                        :logo="selectedProvider.logo"
+                                        :name="selectedProvider.name"
+                                        size="large"
+                                        :show-badge="selectedProvider.is_builtin === 1"
+                                    />
+
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <h2
+                                                class="font-serif text-xl font-semibold text-gray-900"
+                                            >
+                                                {{ selectedProvider.name }}
+                                            </h2>
+                                            <span
+                                                class="bg-primary-50 text-primary-600 rounded-full px-2 py-0.5 text-xs font-medium"
+                                            >
+                                                {{
+                                                    selectedProvider.type === 'openai'
+                                                        ? 'OpenAI'
+                                                        : 'Anthropic'
+                                                }}
+                                            </span>
+                                        </div>
                                     </div>
+                                    <button
+                                        v-if="!selectedProvider.is_builtin"
+                                        class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                                        title="编辑服务商"
+                                        @click="handleEditProvider"
+                                    >
+                                        <SvgIcon name="edit" class="h-5 w-5" />
+                                    </button>
                                 </div>
-                                <button
-                                    v-if="!selectedProvider.is_builtin"
-                                    class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                                    title="编辑服务商"
-                                    @click="handleEditProvider"
-                                >
-                                    <SvgIcon name="edit" class="h-5 w-5" />
-                                </button>
                             </div>
+
+                            <ProviderConfig
+                                :provider="selectedProvider"
+                                @update="handleUpdateProvider"
+                            />
+
+                            <ModelList
+                                :provider-id="selectedProvider.id"
+                                :models="selectedProviderModels"
+                                :default-model-id="defaultModelId"
+                                :provider="selectedProvider"
+                                :refreshing="refreshing"
+                                @create="handleCreateModel"
+                                @update="handleUpdateModel"
+                                @delete="handleDeleteModel"
+                                @set-default="handleSetDefaultModel"
+                                @refresh="handleRefreshModels"
+                            />
                         </div>
-
-                        <ProviderConfig
-                            :provider="selectedProvider"
-                            @update="handleUpdateProvider"
-                        />
-
-                        <ModelList
-                            :provider-id="selectedProvider.id"
-                            :models="selectedProviderModels"
-                            :default-model-id="defaultModelId"
-                            :provider="selectedProvider"
-                            :refreshing="refreshing"
-                            @create="handleCreateModel"
-                            @update="handleUpdateModel"
-                            @delete="handleDeleteModel"
-                            @set-default="handleSetDefaultModel"
-                            @refresh="handleRefreshModels"
-                        />
                     </div>
                 </div>
             </template>

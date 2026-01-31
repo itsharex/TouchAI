@@ -23,7 +23,7 @@ export function useAiRequest(options: UseAiRequestOptions = {}) {
     const hasError = computed(() => error.value !== null);
     const hasResponse = computed(() => response.value.length > 0);
 
-    async function sendRequest(prompt: string) {
+    async function sendRequest(prompt: string, modelIdOverride?: string) {
         if (!prompt.trim()) {
             console.error('[useAiRequest] Empty prompt provided');
             error.value = new Error('Prompt cannot be empty');
@@ -42,7 +42,11 @@ export function useAiRequest(options: UseAiRequestOptions = {}) {
         const startTime = Date.now();
 
         try {
-            const model = await aiService.getActiveModel();
+            // 获取模型（覆盖或默认）
+            const model = modelIdOverride
+                ? await aiService.getModelByModelId(modelIdOverride)
+                : await aiService.getActiveModel();
+
             if (!model) {
                 console.error('[useAiRequest] No active model found');
                 throw new Error('No active AI model configured. Please enable a model first.');
@@ -55,7 +59,7 @@ export function useAiRequest(options: UseAiRequestOptions = {}) {
                 status: 'streaming',
             });
 
-            const stream = aiService.stream(prompt, options.sessionId);
+            const stream = aiService.stream(prompt, options.sessionId, modelIdOverride);
 
             for await (const { chunk } of stream) {
                 // 检查是否已被取消

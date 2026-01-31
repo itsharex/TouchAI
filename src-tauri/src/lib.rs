@@ -20,7 +20,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             window::resize_search_window,
+            window::set_allow_blur_hide,
             settings::open_settings_window,
+            shortcut::register_global_shortcut,
         ])
         .setup(|app| {
             // 设置窗口事件

@@ -2,6 +2,7 @@
 
 import {
     findMessagesBySessionId,
+    findModelByModelId,
     findModelsWithProvider,
     updateModelLastUsed,
 } from '@database/queries';
@@ -46,6 +47,26 @@ export class AiServiceManager {
         }
 
         return defaultModel as ModelWithProvider;
+    }
+
+    /**
+     * 根据 model_id 获取模型（包含服务商信息）
+     */
+    async getModelByModelId(modelId: string): Promise<ModelWithProvider | null> {
+        const model = await findModelByModelId(modelId);
+
+        if (!model) {
+            console.error(`[AiServiceManager] Model "${modelId}" not found`);
+            return null;
+        }
+
+        // 检查服务商是否启用
+        if (model.provider_enabled === 0) {
+            console.error(`[AiServiceManager] Provider for model "${modelId}" is disabled`);
+            return null;
+        }
+
+        return model as ModelWithProvider;
     }
 
     /**
@@ -118,10 +139,24 @@ export class AiServiceManager {
     /**
      * 发送 AI 请求
      */
-    async request(prompt: string, sessionId?: number): Promise<AiResponse> {
-        const activeModel = await this.getActiveModel();
-        if (!activeModel) {
-            throw new Error('No active AI model configured');
+    async request(
+        prompt: string,
+        sessionId?: number,
+        modelIdOverride?: string
+    ): Promise<AiResponse> {
+        // 使用覆盖模型或默认模型
+        let activeModel: ModelWithProvider | null;
+
+        if (modelIdOverride) {
+            activeModel = await this.getModelByModelId(modelIdOverride);
+            if (!activeModel) {
+                throw new Error(`Model "${modelIdOverride}" not found or disabled`);
+            }
+        } else {
+            activeModel = await this.getActiveModel();
+            if (!activeModel) {
+                throw new Error('No active AI model configured');
+            }
         }
 
         const provider = this.getProvider(
@@ -147,12 +182,23 @@ export class AiServiceManager {
      */
     async *stream(
         prompt: string,
-        sessionId?: number
+        sessionId?: number,
+        modelIdOverride?: string
     ): AsyncGenerator<{ chunk: AiStreamChunk; model: ModelWithProvider }, void, unknown> {
-        const activeModel = await this.getActiveModel();
-        if (!activeModel) {
-            console.error('[AiServiceManager] No active model found');
-            throw new Error('No active AI model configured');
+        // 使用覆盖模型或默认模型
+        let activeModel: ModelWithProvider | null;
+
+        if (modelIdOverride) {
+            activeModel = await this.getModelByModelId(modelIdOverride);
+            if (!activeModel) {
+                throw new Error(`Model "${modelIdOverride}" not found or disabled`);
+            }
+        } else {
+            activeModel = await this.getActiveModel();
+            if (!activeModel) {
+                console.error('[AiServiceManager] No active model found');
+                throw new Error('No active AI model configured');
+            }
         }
 
         const provider = this.getProvider(

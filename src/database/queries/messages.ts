@@ -161,6 +161,28 @@ export const countMessagesBySessionId = async (sessionId: number): Promise<numbe
 };
 
 /**
+ * 统计所有消息数
+ */
+export const countMessages = async (): Promise<number> => {
+    const result = await db
+        .getKysely()
+        .selectFrom('messages')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .executeTakeFirst();
+
+    return result?.count || 0;
+};
+
+/**
+ * 删除所有消息
+ */
+export const deleteAllMessages = async (): Promise<number> => {
+    const result = await db.getKysely().deleteFrom('messages').executeTakeFirst();
+
+    return Number(result.numDeletedRows);
+};
+
+/**
  * 获取消息及会话信息（JOIN 查询）
  */
 export const findMessageWithSession = (messageId: number) =>
