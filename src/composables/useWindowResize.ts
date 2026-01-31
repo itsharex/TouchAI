@@ -8,25 +8,21 @@ const MAX_WINDOW_HEIGHT = 700;
 export function useWindowResize() {
     const currentHeight = ref(0);
 
-    async function resizeForResponse(pageHeight: number) {
+    async function resizeForResponse(pageHeight: number, center_window: boolean) {
         // 直接使用页面高度，限制最大高度，并向上取整为整数
         const newHeight = Math.ceil(Math.min(pageHeight, MAX_WINDOW_HEIGHT));
 
         if (newHeight !== currentHeight.value) {
-            await invoke('resize_search_window', { height: newHeight });
+            await invoke('resize_search_window', {
+                height: newHeight,
+                center: center_window,
+            });
             currentHeight.value = newHeight;
         }
-    }
-
-    async function resetToSearchBar() {
-        const SEARCH_BAR_HEIGHT = 60;
-        await invoke('resize_search_window', { height: SEARCH_BAR_HEIGHT });
-        currentHeight.value = SEARCH_BAR_HEIGHT;
     }
 
     return {
         currentHeight,
         resizeForResponse,
-        resetToSearchBar,
     };
 }

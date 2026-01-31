@@ -10,7 +10,7 @@ use tauri::{AppHandle, Manager};
  * 动态调整窗口大小
  */
 #[tauri::command]
-pub async fn resize_search_window(app: AppHandle, height: u32) -> Result<(), String> {
+pub async fn resize_search_window(app: AppHandle, height: u32, center: bool) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
         .ok_or("Failed to get main window")?;
@@ -23,8 +23,10 @@ pub async fn resize_search_window(app: AppHandle, height: u32) -> Result<(), Str
         }))
         .map_err(|e| e.to_string())?;
 
-    // 重新居中窗口
-    window.center().map_err(|e| e.to_string())?;
+    if center {
+        // 重新居中窗口
+        window.center().map_err(|e| e.to_string())?;
+    }
 
     Ok(())
 }

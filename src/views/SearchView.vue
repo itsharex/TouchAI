@@ -54,11 +54,22 @@
         if (isOpen) {
             // 下拉框打开时，扩展窗口高度以容纳下拉框
             // 搜索框高度 + 下拉框最大高度 + 间距
-            await resizeForResponse(56 + 384 + 40); // 56px searchbar + 384px dropdown (max-h-96) + 40px padding
+            const dropdownHeight = 56 + 384 + 40; // 56px searchbar + 384px dropdown (max-h-96) + 40px padding
+
+            // 如果有响应内容，取当前页面高度和下拉框高度的较大值
+            if (hasResponse.value && pageContainer.value) {
+                const currentHeight = pageContainer.value.clientHeight;
+                await resizeForResponse(Math.max(currentHeight, dropdownHeight), false);
+            } else {
+                await resizeForResponse(dropdownHeight, false);
+            }
         } else {
             // 下拉框关闭时，恢复原始高度
             if (!hasResponse.value) {
-                await resizeForResponse(56 + 40); // 只有搜索框
+                await resizeForResponse(56 + 40, true); // 只有搜索框
+            } else if (pageContainer.value) {
+                // 如果有响应内容，恢复到响应内容的实际高度
+                await resizeForResponse(pageContainer.value.clientHeight, true);
             }
         }
     }
@@ -143,6 +154,11 @@
             if (event.key.length === 1 || event.key === 'Backspace') {
                 searchBar.value?.focus();
             }
+        } else {
+            if (['ArrowUp', 'ArrowDown'].includes(event.key)) {
+                responseDisplay.value?.focus();
+                return;
+            }
         }
 
         // Backspace 键处理
@@ -184,7 +200,7 @@
         resizeObserver = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 const height = entry.borderBoxSize?.[0]?.blockSize ?? entry.target.clientHeight;
-                resizeForResponse(height).catch((error) => {
+                resizeForResponse(height, true).catch((error) => {
                     console.error('[SearchView] Failed to resize window:', error);
                 });
             }
@@ -194,9 +210,11 @@
 
         // 初始触发一次
         nextTick(() => {
-            resizeForResponse((pageContainer.value as HTMLElement).clientHeight).catch((error) => {
-                console.error('[SearchView] Failed to resize window:', error);
-            });
+            resizeForResponse((pageContainer.value as HTMLElement).clientHeight, true).catch(
+                (error) => {
+                    console.error('[SearchView] Failed to resize window:', error);
+                }
+            );
         });
     }
 

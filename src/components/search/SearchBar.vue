@@ -191,6 +191,8 @@
             searchInput.value?.focus();
         } else {
             // 关闭下拉框：恢复原始状态
+            isModelDropdownOpen.value = false;
+            dropdownSearchQuery.value = '';
             restoreSearchState();
         }
         emit('dropdownStateChange', isModelDropdownOpen.value);
