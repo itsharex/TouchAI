@@ -303,8 +303,6 @@
                     attachments.value.push(await createAttachment('file', filePath));
                 }
             }
-
-            console.log(attachments?.value);
         } catch (error) {
             console.error('[SearchView] Failed to handle paste:', error);
         }
