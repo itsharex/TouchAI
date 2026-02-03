@@ -2,11 +2,18 @@
 
 <script setup lang="ts">
     import { useAlert } from '@composables/useAlert';
+    import { upsertLlmMetadata } from '@database/queries';
     import type { Model } from '@database/schema';
     import { ref, watch } from 'vue';
 
     interface Props {
-        model: Model;
+        model: Model & {
+            metadata_attachment?: number;
+            metadata_modalities?: string;
+            metadata_open_weights?: number;
+            metadata_reasoning?: number;
+            metadata_tool_call?: number;
+        };
     }
 
     interface Emits {
@@ -22,7 +29,23 @@
     const form = ref({
         name: props.model.name,
         model_id: props.model.model_id,
+        reasoning: props.model.metadata_reasoning === 1,
+        tool_call: props.model.metadata_tool_call === 1,
+        attachment: props.model.metadata_attachment === 1,
+        open_weights: props.model.metadata_open_weights === 1,
+        multimodal: false,
     });
+
+    // 初始化多模态状态
+    if (props.model.metadata_modalities) {
+        try {
+            const modalities = JSON.parse(props.model.metadata_modalities);
+            form.value.multimodal =
+                modalities.input?.includes('image') || modalities.output?.includes('image');
+        } catch {
+            // 忽略解析错误
+        }
+    }
 
     // 监听 model 变化，更新表单
     watch(
@@ -31,20 +54,56 @@
             form.value = {
                 name: newModel.name,
                 model_id: newModel.model_id,
+                reasoning: newModel.metadata_reasoning === 1,
+                tool_call: newModel.metadata_tool_call === 1,
+                attachment: newModel.metadata_attachment === 1,
+                open_weights: newModel.metadata_open_weights === 1,
+                multimodal: false,
             };
+
+            if (newModel.metadata_modalities) {
+                try {
+                    const modalities = JSON.parse(newModel.metadata_modalities);
+                    form.value.multimodal =
+                        modalities.input?.includes('image') || modalities.output?.includes('image');
+                } catch {
+                    // 忽略解析错误
+                }
+            }
         }
     );
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!form.value.name || !form.value.model_id) {
             alert.error('请填写模型名称和模型 ID');
             return;
         }
 
-        emit('update', {
-            name: form.value.name,
-            model_id: form.value.model_id,
-        });
+        try {
+            // 构建 modalities JSON
+            const modalities = {
+                input: form.value.multimodal ? ['text', 'image'] : ['text'],
+                output: ['text'],
+            };
+
+            // 更新元数据
+            await upsertLlmMetadata(form.value.model_id, {
+                name: form.value.name,
+                reasoning: form.value.reasoning ? 1 : 0,
+                tool_call: form.value.tool_call ? 1 : 0,
+                attachment: form.value.attachment ? 1 : 0,
+                open_weights: form.value.open_weights ? 1 : 0,
+                modalities: JSON.stringify(modalities),
+            });
+
+            // 更新模型基本信息
+            emit('update', {
+                name: form.value.name,
+                model_id: form.value.model_id,
+            });
+        } catch (err) {
+            alert.error(err instanceof Error ? err.message : '保存失败');
+        }
     };
 </script>
 
@@ -78,6 +137,74 @@
                         placeholder="gpt-4o"
                     />
                     <p class="mt-1 text-xs text-gray-400">API 调用时使用的模型标识符</p>
+                </div>
+
+                <div>
+                    <label class="mb-2 block font-serif text-sm font-medium text-gray-600">
+                        模型能力
+                    </label>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded px-1.5 py-0.5 text-xs font-medium transition-colors',
+                                form.reasoning
+                                    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200',
+                            ]"
+                            @click="form.reasoning = !form.reasoning"
+                        >
+                            推理
+                        </button>
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded px-1.5 py-0.5 text-xs font-medium transition-colors',
+                                form.tool_call
+                                    ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200',
+                            ]"
+                            @click="form.tool_call = !form.tool_call"
+                        >
+                            工具
+                        </button>
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded px-1.5 py-0.5 text-xs font-medium transition-colors',
+                                form.multimodal
+                                    ? 'bg-purple-50 text-purple-600 hover:bg-purple-100'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200',
+                            ]"
+                            @click="form.multimodal = !form.multimodal"
+                        >
+                            多模态
+                        </button>
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded px-1.5 py-0.5 text-xs font-medium transition-colors',
+                                form.attachment
+                                    ? 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200',
+                            ]"
+                            @click="form.attachment = !form.attachment"
+                        >
+                            文件
+                        </button>
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded px-1.5 py-0.5 text-xs font-medium transition-colors',
+                                form.open_weights
+                                    ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200',
+                            ]"
+                            @click="form.open_weights = !form.open_weights"
+                        >
+                            开源
+                        </button>
+                    </div>
                 </div>
             </div>
 

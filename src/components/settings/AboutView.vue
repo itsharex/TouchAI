@@ -1,4 +1,5 @@
 <script setup lang="ts">
+    import SvgIcon from '@components/common/SvgIcon.vue';
     import { getTauriVersion, getVersion } from '@tauri-apps/api/app';
     import { openUrl } from '@tauri-apps/plugin-opener';
     import { onMounted, ref } from 'vue';
@@ -127,14 +128,7 @@
                     <div
                         class="bg-primary-50 text-primary-600 flex h-16 w-16 items-center justify-center rounded-lg"
                     >
-                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                        </svg>
+                        <SvgIcon name="information-circle" class="h-6 w-6" />
                     </div>
 
                     <div class="flex-1">

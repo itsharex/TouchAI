@@ -22,8 +22,8 @@
 
     const navigationItems: NavigationItem[] = [
         { id: 'general', icon: 'settings', label: '常规设置' },
-        { id: 'ai-services', icon: 'document', label: '大模型服务设置' },
-        { id: 'data-management', icon: 'archive-box', label: '数据管理' },
+        { id: 'ai-services', icon: 'llm', label: '大模型服务设置' },
+        { id: 'data-management', icon: 'database', label: '数据管理' },
         { id: 'about', icon: 'information-circle', label: '关于' },
     ];
 

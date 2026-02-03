@@ -17,6 +17,7 @@
         models: Model[];
         defaultModelId: number | null;
         provider: Provider | undefined;
+        providerEnabled: boolean;
         refreshing?: boolean;
     }
 
@@ -191,7 +192,7 @@
             class="rounded-lg border border-gray-200 bg-white p-8 text-center"
         >
             <div class="mx-auto max-w-sm">
-                <SvgIcon name="document" class="mx-auto h-10 w-10 text-gray-300" />
+                <SvgIcon name="llm" class="mx-auto h-10 w-10 text-gray-300" />
                 <h3 class="mt-3 font-serif text-base font-medium text-gray-900">暂无模型</h3>
                 <p class="mt-1 text-xs text-gray-500">
                     <template v-if="!provider?.api_endpoint">
@@ -228,10 +229,11 @@
 
         <div v-else class="space-y-3">
             <ModelGroup
-                v-for="group in modelGroups"
-                :key="group.groupKey"
+                v-for="(group, index) in modelGroups"
+                :key="provider?.id + group.groupKey + index"
                 :group="group"
                 :default-model-id="defaultModelId"
+                :provider-enabled="providerEnabled"
                 @update="(id, data) => emit('update', id, data)"
                 @delete="(id) => emit('delete', id)"
                 @delete-group="handleDeleteGroup"

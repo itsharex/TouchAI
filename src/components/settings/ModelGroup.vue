@@ -12,6 +12,7 @@
     interface Props {
         group: ModelGroup;
         defaultModelId: number | null;
+        providerEnabled: boolean;
     }
 
     interface Emits {
@@ -97,6 +98,7 @@
                 :key="model.id"
                 :model="model"
                 :is-default="model.id === defaultModelId"
+                :provider-enabled="providerEnabled"
                 @update="(data) => emit('update', model.id, data)"
                 @delete="emit('delete', model.id)"
                 @set-default="emit('set-default', model.id)"
