@@ -1,6 +1,7 @@
 <!-- Copyright (c) 2026. Qian Cheng. Licensed under GPL v3 -->
 
 <script setup lang="ts">
+    import ModelCapabilityTags from '@components/common/ModelCapabilityTags.vue';
     import { findModelsWithProvider } from '@database/queries';
     import { getModelLogoByModelName } from '@utils/modelLogoMatcher';
     import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -9,13 +10,22 @@
         id: number;
         modelId: string;
         name: string;
+        providerId: number;
         providerName: string;
         logo: string | null;
+        metadata_reasoning?: number | null;
+        metadata_tool_call?: number | null;
+        metadata_modalities?: string | null;
+        metadata_attachment?: number | null;
+        metadata_open_weights?: number | null;
     }
 
     interface Props {
         isOpen: boolean;
         activeModelId: string;
+        activeProviderId: number | null;
+        selectedModelId: string;
+        selectedProviderId: number | null;
         searchQuery: string;
     }
 
@@ -31,6 +41,7 @@
     const highlightedIndex = ref(0);
     const dropdownRef = ref<HTMLElement | null>(null);
     const itemRefs = ref<HTMLElement[]>([]);
+    let scrollRafId: number | null = null;
 
     // 加载启用的模型
     async function loadModels() {
@@ -43,8 +54,14 @@
                     id: m.id,
                     modelId: m.model_id,
                     name: m.name,
+                    providerId: m.provider_id,
                     providerName: m.provider_name,
                     logo: getModelLogoByModelName(m.model_id),
+                    metadata_reasoning: m.metadata_reasoning,
+                    metadata_tool_call: m.metadata_tool_call,
+                    metadata_modalities: m.metadata_modalities,
+                    metadata_attachment: m.metadata_attachment,
+                    metadata_open_weights: m.metadata_open_weights,
                 }));
         } catch (error) {
             console.error('[ModelDropdown] Failed to load models:', error);
@@ -59,25 +76,78 @@
     // 根据搜索查询过滤模型
     const filteredModels = computed(() => {
         if (!props.searchQuery) return models.value;
-        const query = props.searchQuery.toLowerCase();
-        return models.value.filter(
-            (m) =>
-                m.name.toLowerCase().includes(query) ||
-                m.modelId.toLowerCase().includes(query) ||
-                m.providerName.toLowerCase().includes(query)
-        );
+        const query = props.searchQuery.toLowerCase().trim();
+        if (!query) return models.value;
+
+        const tokens = query.split(/\s+/).filter(Boolean);
+        const scored = models.value
+            .map((model) => {
+                const fields = [
+                    model.name.toLowerCase(),
+                    model.modelId.toLowerCase(),
+                    model.providerName.toLowerCase(),
+                    `${model.providerName} ${model.modelId}`.toLowerCase(),
+                ];
+
+                let totalScore = 0;
+                for (const token of tokens) {
+                    let best = -1;
+                    for (const field of fields) {
+                        const score = scoreMatch(token, field);
+                        if (score > best) best = score;
+                    }
+                    if (best < 0) {
+                        return null;
+                    }
+                    totalScore += best;
+                }
+
+                return { model, score: totalScore };
+            })
+            .filter(Boolean) as Array<{ model: ModelOption; score: number }>;
+
+        return scored.sort((a, b) => b.score - a.score).map((item) => item.model);
     });
 
-    // 滚动到高亮的项
+    function scoreMatch(token: string, text: string): number {
+        if (!token) return -1;
+        const index = text.indexOf(token);
+        if (index !== -1) {
+            return 200 - index;
+        }
+        if (isSubsequence(token, text)) {
+            return 100;
+        }
+        return -1;
+    }
+
+    function isSubsequence(needle: string, haystack: string): boolean {
+        let i = 0;
+        for (const ch of haystack) {
+            if (ch === needle[i]) {
+                i += 1;
+                if (i >= needle.length) return true;
+            }
+        }
+        return false;
+    }
+
+    // 滚动到高亮的项（合并多次键盘滚动，避免延迟）
     const scrollToHighlighted = async () => {
         await nextTick();
-        const highlightedElement = itemRefs.value[highlightedIndex.value];
-        if (highlightedElement && dropdownRef.value) {
-            highlightedElement.scrollIntoView({
-                block: 'nearest',
-                behavior: 'smooth',
-            });
+        if (scrollRafId !== null) {
+            cancelAnimationFrame(scrollRafId);
         }
+        scrollRafId = requestAnimationFrame(() => {
+            const highlightedElement = itemRefs.value[highlightedIndex.value];
+            if (highlightedElement && dropdownRef.value) {
+                highlightedElement.scrollIntoView({
+                    block: 'nearest',
+                    behavior: 'auto',
+                });
+            }
+            scrollRafId = null;
+        });
     };
 
     // 键盘导航
@@ -146,7 +216,7 @@
         </div>
         <div
             v-for="(model, index) in filteredModels"
-            :key="model.id"
+            :key="model.id + index"
             :ref="
                 (el) => {
                     if (el) itemRefs[index] = el as HTMLElement;
@@ -154,19 +224,53 @@
             "
             :class="[
                 'flex cursor-pointer items-center gap-3 px-4 py-2',
-                index === highlightedIndex ? 'bg-blue-50' : 'hover:bg-gray-50',
+                index === highlightedIndex ? 'bg-primary-50' : 'hover:bg-gray-50',
             ]"
             @click="emit('select', model.id)"
         >
-            <img
-                v-if="model.logo"
-                :src="`/src/assets/logos/models/${model.logo}`"
-                :alt="model.name"
-                class="h-6 w-6 rounded"
-            />
-            <div class="flex-1">
-                <div class="text-sm font-medium">{{ model.name }}</div>
-                <div class="text-xs text-gray-500">{{ model.providerName }}</div>
+            <div class="relative">
+                <img
+                    v-if="model.logo"
+                    :src="`/src/assets/logos/models/${model.logo}`"
+                    :alt="model.name"
+                    class="h-6 w-6 rounded"
+                />
+                <div
+                    v-else
+                    class="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[10px] font-semibold text-gray-500"
+                >
+                    {{ model.name.charAt(0) }}
+                </div>
+                <div
+                    class="absolute top-full left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap"
+                >
+                    <span
+                        v-if="
+                            model.modelId === selectedModelId &&
+                            model.providerId === selectedProviderId
+                        "
+                        class="flex-shrink-0 rounded border border-gray-300 bg-white px-1 py-0.5 text-[10px] leading-none text-gray-600 shadow-sm"
+                    >
+                        当前
+                    </span>
+                    <span
+                        v-if="
+                            model.modelId === activeModelId && model.providerId === activeProviderId
+                        "
+                        class="rounded border border-gray-300 bg-white px-1 py-0.5 text-[10px] leading-none text-gray-600 shadow-sm"
+                    >
+                        默认
+                    </span>
+                </div>
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-medium">{{ model.name }}</span>
+                    <span class="text-[11px] text-gray-500">{{ model.providerName }}</span>
+                </div>
+                <div class="mt-1">
+                    <ModelCapabilityTags :model="model" size="sm" />
+                </div>
             </div>
         </div>
         <div v-if="filteredModels.length === 0" class="px-4 py-3 text-sm text-gray-500">

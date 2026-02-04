@@ -7,16 +7,23 @@
     import { useWindowResize } from '@composables/useWindowResize';
     import { invoke } from '@tauri-apps/api/core';
     import { getCurrentWindow } from '@tauri-apps/api/window';
-    import type { Attachment } from '@utils/attachment';
-    import { createAttachment } from '@utils/attachment.ts';
+    import {
+        type Attachment,
+        type AttachmentSupportStatus,
+        createAttachment,
+        isAttachmentSupported,
+    } from '@utils/attachment.ts';
     import { readClipboard, ReadClipboardItem } from 'tauri-plugin-clipboard-x-api';
-    import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+    import { computed, nextTick, onMounted, onUnmounted, ref, unref } from 'vue';
 
     const searchQuery = ref('');
     const searchBar = ref<InstanceType<typeof SearchBar>>();
     const responseDisplay = ref<InstanceType<typeof ResponsePanel>>();
     const pageContainer = ref<HTMLElement | null>(null);
     const attachments = ref<Attachment[]>([]);
+    const modelCapabilities = ref({ supportsImages: false, supportsFiles: false });
+    const isPinned = ref(false);
+    const isDragging = ref(false);
     let resizeObserver: ResizeObserver | null = null;
     let unlistenFocus: (() => void) | null = null;
     let unlistenBlur: (() => void) | null = null;
@@ -30,6 +37,12 @@
 
     const { resizeForResponse } = useWindowResize();
 
+    // 是否应该在失焦时隐藏窗口（只有置顶且有响应内容时才不隐藏，拖动时也不隐藏）
+    const shouldHideOnBlur = computed(() => {
+        if (isDragging.value) return false;
+        return !(isPinned.value && hasResponse.value);
+    });
+
     document.oncontextmenu = function () {
         return false;
     };
@@ -41,15 +54,20 @@
     async function handleSubmit(query: string) {
         reset();
 
-        const selectedModelId = searchBar.value?.selectedModelId;
-        const selectedProviderId = searchBar.value?.selectedProviderId;
+        const selectedModelId = unref(searchBar.value?.selectedModelId);
+        const selectedProviderId = unref(searchBar.value?.selectedProviderId);
 
-        // TODO: 处理附件上传
-        if (attachments.value.length > 0) {
-            console.log('[SearchView] Attachments to upload:', attachments.value);
+        const supportedAttachments = attachments.value.filter(isAttachmentSupported);
+        if (supportedAttachments.length > 0) {
+            console.log('[SearchView] Attachments to upload:', supportedAttachments);
         }
 
-        await sendRequest(query, selectedModelId || undefined, selectedProviderId || undefined);
+        await sendRequest(
+            query,
+            selectedModelId || undefined,
+            selectedProviderId || undefined,
+            supportedAttachments
+        );
     }
 
     // 处理清空事件（点击清除按钮）
@@ -64,6 +82,27 @@
         if (index !== -1) {
             attachments.value.splice(index, 1);
         }
+    }
+
+    function getAttachmentSupportStatus(attachment: Attachment): AttachmentSupportStatus {
+        if (attachment.type === 'image' && !modelCapabilities.value.supportsImages) {
+            return 'unsupported-image';
+        }
+        if (attachment.type === 'file' && !modelCapabilities.value.supportsFiles) {
+            return 'unsupported-file';
+        }
+        return 'supported';
+    }
+
+    function syncAttachmentSupport() {
+        attachments.value.forEach((attachment) => {
+            attachment.supportStatus = getAttachmentSupportStatus(attachment);
+        });
+    }
+
+    function handleModelChange(capabilities: { supportsImages: boolean; supportsFiles: boolean }) {
+        modelCapabilities.value = capabilities;
+        syncAttachmentSupport();
     }
 
     // 处理下拉框状态变化
@@ -215,8 +254,8 @@
                 return;
             }
 
-            // 如果输入框为空且有选择的模型，删除模型选择
-            if (!searchQuery.value && searchBar.value?.selectedModelId) {
+            // 如果光标在开头且已选择模型，退格取消模型选择
+            if (searchBar.value?.selectedModelId && searchBar.value?.isCursorAtStart?.()) {
                 event.preventDefault();
                 searchBar.value?.clearSelectedModel();
                 return;
@@ -277,6 +316,7 @@
         });
 
         unlistenBlur = await getCurrentWindow().listen('tauri://blur', async () => {
+            if (!shouldHideOnBlur.value) return;
             await invoke('hide_search_window');
         });
     }
@@ -294,14 +334,20 @@
 
             const { files, image } = clipboard;
 
+            async function addAttachment(type: 'image' | 'file', path: string) {
+                const attachment = await createAttachment(type, path);
+                attachment.supportStatus = getAttachmentSupportStatus(attachment);
+                attachments.value.push(attachment);
+            }
+
             // 处理图片
             if (image) {
-                attachments.value.push(await createAttachment('image', image.value));
+                await addAttachment('image', image.value);
             }
 
             if (files && files?.value?.length > 0) {
                 for (const filePath of files.value) {
-                    attachments.value.push(await createAttachment('file', filePath));
+                    await addAttachment('file', filePath);
                 }
             }
         } catch (error) {
@@ -360,6 +406,9 @@
             @remove-attachment="handleRemoveAttachment"
             @dropdown-state-change="handleDropdownStateChange"
             @attachment-overflow-state-change="handleAttachmentOverflowStateChange"
+            @model-change="handleModelChange"
+            @drag-start="isDragging = true"
+            @drag-end="isDragging = false"
         />
         <ResponsePanel
             v-if="hasResponse"
@@ -368,6 +417,8 @@
             :reasoning="reasoning"
             :is-loading="isLoading"
             :error="error"
+            :is-pinned="isPinned"
+            @pin-change="(value: boolean) => (isPinned = value)"
         />
     </div>
 </template>

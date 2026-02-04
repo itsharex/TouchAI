@@ -3,6 +3,7 @@
 <script setup lang="ts">
     import SvgIcon from '@components/common/SvgIcon.vue';
     import type { Attachment } from '@utils/attachment.ts';
+    import { getAttachmentSupportMessage, isAttachmentSupported } from '@utils/attachment.ts';
     import { ref } from 'vue';
 
     interface Props {
@@ -28,6 +29,24 @@
         isOpen.value = false;
         emit('dropdownStateChange', false);
     }
+
+    function getAttachmentTitle(attachment: Attachment) {
+        return getAttachmentSupportMessage(attachment) || attachment.name;
+    }
+
+    function getAttachmentClass(attachment: Attachment) {
+        return [
+            'group relative flex items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0',
+            isAttachmentSupported(attachment)
+                ? 'cursor-pointer hover:bg-gray-50'
+                : 'cursor-not-allowed opacity-50 grayscale',
+        ];
+    }
+
+    function handlePreview(attachment: Attachment) {
+        if (!isAttachmentSupported(attachment)) return;
+        emit('preview', attachment);
+    }
 </script>
 
 <template>
@@ -45,9 +64,9 @@
             <div
                 v-for="attachment in attachments"
                 :key="attachment.id"
-                :title="attachment.name"
-                class="group relative flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50"
-                @click="emit('preview', attachment)"
+                :title="getAttachmentTitle(attachment)"
+                :class="getAttachmentClass(attachment)"
+                @click="handlePreview(attachment)"
             >
                 <img
                     v-if="attachment.preview"

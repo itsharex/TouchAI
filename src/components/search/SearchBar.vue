@@ -3,38 +3,31 @@
   -->
 
 <template>
-    <div ref="containerRef" class="relative mx-auto h-[56px] w-full select-none">
+    <div ref="containerRef" class="relative mx-auto h-full w-full select-none">
         <div
             :class="[
                 'search-bar-container bg-background-primary relative flex h-full items-center gap-3 rounded-lg p-3 backdrop-blur-xl transition-all duration-250 ease-in-out',
                 isLoading ? 'loading' : '',
             ]"
+            data-tauri-drag-region
+            @mousedown="handleContainerMouseDown"
         >
             <div
-                class="flex cursor-pointer items-center justify-center"
-                data-tauri-drag-region="false"
+                class="logo-container flex cursor-pointer items-center justify-center"
+                @click.stop="toggleModelDropdown"
             >
                 <img
                     v-if="selectedModelId || activeModel"
                     :src="getModelLogoPath(selectedModelId || activeModel?.model_id || '')"
                     :alt="selectedModelName || activeModel?.name || 'model'"
                     class="h-8 w-8 rounded-full border-2 border-gray-300 transition-colors hover:border-gray-400"
-                    data-tauri-drag-region="false"
-                    @click.stop="toggleModelDropdown"
                 />
-                <img
-                    v-else
-                    :src="logoWord"
-                    alt="search"
-                    class="h-5 w-15 select-none"
-                    data-tauri-drag-region="false"
-                    @click.stop="toggleModelDropdown"
-                />
+                <img v-else :src="logoWord" alt="search" class="h-5 w-15 select-none" />
             </div>
 
             <div
                 v-if="selectedModelId"
-                class="inline-flex items-center gap-1.5 rounded-md bg-blue-100 px-2 py-1 text-sm font-medium text-blue-700"
+                class="inline-flex items-center gap-1.5 rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700"
             >
                 <span>@{{ selectedModelName }}</span>
                 <button
@@ -57,6 +50,7 @@
                     disabled ? 'text-gray-400' : 'text-gray-900',
                 ]"
                 @input="onInput"
+                @mousedown="handleInputMouseDown"
             />
 
             <AttachmentList
@@ -71,6 +65,9 @@
             ref="modelDropdownRef"
             :is-open="isModelDropdownOpen"
             :active-model-id="activeModel?.model_id || ''"
+            :active-provider-id="activeModel?.provider_id ?? null"
+            :selected-model-id="selectedModelId || ''"
+            :selected-provider-id="selectedProviderId ?? null"
             :search-query="dropdownSearchQuery"
             @select="handleModelSelect"
             @close="closeModelDropdown"
@@ -85,12 +82,18 @@
     import AttachmentList from '@components/search/AttachmentList.vue';
     import ModelDropdown from '@components/search/ModelDropdown.vue';
     import { findModelsWithProvider } from '@database/queries';
-    import type { ModelWithProvider } from '@services/ai/manager';
+    import type { ModelWithProviderAndMetadata } from '@database/queries/models';
     import { aiService } from '@services/ai/manager';
+    import { getCurrentWindow } from '@tauri-apps/api/window';
     import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
     import type { Attachment } from '@utils/attachment.ts';
     import { getModelLogoByModelName } from '@utils/modelLogoMatcher';
-    import { computed, onMounted, onUnmounted, ref } from 'vue';
+    import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+
+    interface ModelCapabilities {
+        supportsImages: boolean;
+        supportsFiles: boolean;
+    }
 
     interface Props {
         disabled?: boolean;
@@ -121,7 +124,8 @@
     const selectedModelId = ref<string | null>(null);
     const selectedModelName = ref<string | null>(null);
     const selectedProviderId = ref<number | null>(null); // 添加 provider_id
-    const activeModel = ref<ModelWithProvider | null>(null);
+    const activeModel = ref<ModelWithProviderAndMetadata | null>(null);
+    const selectedModel = ref<ModelWithProviderAndMetadata | null>(null);
     const isModelDropdownOpen = ref(false);
     const dropdownSearchQuery = ref('');
 
@@ -131,13 +135,17 @@
         clear: [];
         dropdownStateChange: [isOpen: boolean];
         attachmentOverflowStateChange: [isOpen: boolean];
+        modelChange: [capabilities: ModelCapabilities];
         removeAttachment: [id: string];
+        dragStart: [];
+        dragEnd: [];
     }>();
 
     // 加载活动模型
     const loadActiveModel = async () => {
         try {
-            activeModel.value = await aiService.getActiveModel();
+            activeModel.value =
+                (await aiService.getActiveModel()) as ModelWithProviderAndMetadata | null;
         } catch (error) {
             console.error('[SearchBar] Failed to load active model:', error);
         }
@@ -172,6 +180,10 @@
     }
 
     function toggleModelDropdown() {
+        console.log(
+            '[SearchBar] toggleModelDropdown called, current state:',
+            isModelDropdownOpen.value
+        );
         if (!isModelDropdownOpen.value) {
             // 打开下拉框：保存当前状态，清空输入框
             savedSearchQuery.value = searchQuery.value;
@@ -180,6 +192,7 @@
             isSearchingModel.value = true;
             dropdownSearchQuery.value = '';
             isModelDropdownOpen.value = true;
+            console.log('[SearchBar] Dropdown opened');
             // 确保输入框保持焦点
             searchInput.value?.focus();
         } else {
@@ -187,6 +200,7 @@
             isModelDropdownOpen.value = false;
             dropdownSearchQuery.value = '';
             restoreSearchState();
+            console.log('[SearchBar] Dropdown closed');
         }
         emit('dropdownStateChange', isModelDropdownOpen.value);
     }
@@ -221,9 +235,17 @@
             const models = await findModelsWithProvider();
             const model = models.find((m) => m.id === modelDbId);
             if (model) {
-                selectedModelId.value = model.model_id;
-                selectedModelName.value = model.name;
-                selectedProviderId.value = model.provider_id;
+                const isDefaultModel =
+                    model.model_id === activeModel.value?.model_id &&
+                    model.provider_id === activeModel.value?.provider_id;
+                if (isDefaultModel) {
+                    clearSelectedModel();
+                } else {
+                    selectedModel.value = model;
+                    selectedModelId.value = model.model_id;
+                    selectedModelName.value = model.name;
+                    selectedProviderId.value = model.provider_id;
+                }
             }
         } catch (error) {
             console.error('[SearchBar] Failed to select model:', error);
@@ -236,10 +258,43 @@
     }
 
     function clearSelectedModel() {
+        selectedModel.value = null;
         selectedModelId.value = null;
         selectedModelName.value = null;
         selectedProviderId.value = null;
     }
+
+    function parseModalities(modalities?: string | null) {
+        if (!modalities) return { input: ['text'], output: ['text'] };
+        try {
+            return JSON.parse(modalities) as { input?: string[]; output?: string[] };
+        } catch (error) {
+            console.warn('[SearchBar] Failed to parse model modalities:', error);
+            return { input: ['text'], output: ['text'] };
+        }
+    }
+
+    const currentModel = computed(() => selectedModel.value || activeModel.value);
+
+    const modelCapabilities = computed<ModelCapabilities>(() => {
+        const model = currentModel.value;
+        if (!model) {
+            return { supportsImages: false, supportsFiles: false };
+        }
+        const modalities = parseModalities(model.metadata_modalities);
+        return {
+            supportsImages: Boolean(modalities.input?.includes('image')),
+            supportsFiles: model.metadata_attachment === 1,
+        };
+    });
+
+    watch(
+        modelCapabilities,
+        (capabilities) => {
+            emit('modelChange', capabilities);
+        },
+        { immediate: true }
+    );
 
     function onInput() {
         // 如果下拉框打开，输入内容用于搜索模型
@@ -294,8 +349,91 @@
         searchQuery.value = '';
     }
 
+    function isCursorAtStart(): boolean {
+        const input = searchInput.value;
+        if (!input) return false;
+        const start = input.selectionStart ?? 0;
+        const end = input.selectionEnd ?? start;
+        return start === 0 && end === 0;
+    }
+
     async function focus() {
         searchInput?.value?.focus();
+    }
+
+    // 处理容器的 mousedown 事件，空白区域支持拖动
+    async function handleContainerMouseDown(event: MouseEvent) {
+        const target = event.target as HTMLElement;
+
+        // 如果点击的是 logo 容器或其子元素，不处理拖动
+        const logoContainer = target.closest('.logo-container');
+        if (logoContainer) {
+            return;
+        }
+
+        // 如果点击的是容器本身（空白区域），启动拖动
+        if (target.hasAttribute('data-tauri-drag-region')) {
+            emit('dragStart');
+            try {
+                await getCurrentWindow().startDragging();
+            } finally {
+                // 延迟清除拖动状态，避免拖动结束时立即触发失焦隐藏
+                setTimeout(() => {
+                    emit('dragEnd');
+                }, 100);
+            }
+        }
+    }
+
+    // 处理 input 的 mousedown 事件
+    async function handleInputMouseDown(event: MouseEvent) {
+        const input = searchInput.value;
+        if (!input) return;
+
+        // 如果 input 为空（显示 placeholder），整个区域都支持拖动
+        if (!input.value) {
+            event.preventDefault();
+            emit('dragStart');
+            try {
+                await getCurrentWindow().startDragging();
+            } finally {
+                // 延迟清除拖动状态，避免拖动结束时立即触发失焦隐藏
+                setTimeout(() => {
+                    emit('dragEnd');
+                }, 100);
+            }
+            return;
+        }
+
+        // 获取点击位置相对于 input 的 x 坐标
+        const rect = input.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+
+        // 计算已输入文本的宽度
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // 获取 input 的计算样式
+        const style = window.getComputedStyle(input);
+        ctx.font = `${style.fontSize} ${style.fontFamily}`;
+        const textWidth = ctx.measureText(input.value).width;
+
+        // 如果点击位置在文本之后（空白区域），启动拖动
+        // 添加一些 padding 容差
+        const padding = 10;
+        if (clickX > textWidth + padding) {
+            event.preventDefault();
+            emit('dragStart');
+            try {
+                await getCurrentWindow().startDragging();
+            } finally {
+                // 延迟清除拖动状态，避免拖动结束时立即触发失焦隐藏
+                setTimeout(() => {
+                    emit('dragEnd');
+                }, 100);
+            }
+        }
     }
 
     defineExpose({
@@ -309,6 +447,7 @@
         focus,
         clearInput,
         loadActiveModel,
+        isCursorAtStart,
     });
 </script>
 

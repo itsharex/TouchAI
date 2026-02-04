@@ -7,10 +7,31 @@
         <div
             ref="responseContainer"
             tabindex="0"
-            class="response-container custom-scrollbar bg-background-primary mt-2 w-full overflow-y-auto rounded-lg border border-gray-300 px-10 py-5 shadow-lg backdrop-blur-xl"
+            class="response-container custom-scrollbar bg-background-primary w-full overflow-y-auto rounded-lg border border-gray-300 px-10 py-5 shadow-lg backdrop-blur-xl"
             :style="{ maxHeight: `${maxHeight}px` }"
             @scroll="handleScroll"
         >
+            <div class="flex items-center justify-end gap-1">
+                <button
+                    class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                    aria-label="Pin response panel"
+                    @click.stop="togglePinned"
+                >
+                    <SvgIcon
+                        name="pin"
+                        class="h-4 w-4 transition-transform duration-200 ease-in-out"
+                        :class="isPinned ? 'rotate-[-30deg]' : 'rotate-0'"
+                    />
+                </button>
+                <button
+                    class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                    aria-label="Copy full markdown"
+                    @click.stop="copyFullMarkdown"
+                >
+                    <SvgIcon name="copy" class="h-4 w-4" />
+                </button>
+            </div>
+
             <div v-if="reasoning || isThinking" class="reasoning-section mb-4 w-full">
                 <button
                     class="flex w-full items-center gap-2 px-1 py-2 text-left text-sm font-normal text-gray-700 transition-colors hover:text-gray-900"
@@ -46,7 +67,6 @@
             <div
                 v-if="content"
                 class="markdown-content prose prose-sm response-text max-w-none select-text"
-                :class="{ 'pt-4': !reasoning && !isThinking }"
                 v-html="renderedContent"
             ></div>
 
@@ -88,19 +108,23 @@
         isLoading: boolean;
         error: Error | null;
         maxHeight?: number;
+        isPinned?: boolean;
     }
 
     const props = withDefaults(defineProps<Props>(), {
         maxHeight: 600,
         reasoning: '',
+        isPinned: false,
     });
 
     const emit = defineEmits<{
         heightChange: [height: number];
+        pinChange: [isPinned: boolean];
     }>();
 
     const responseContainer = ref<HTMLElement | null>(null);
     const reasoningContainer = ref<HTMLElement | null>(null);
+    const isPinned = computed(() => props.isPinned);
     const isReasoningExpanded = ref(true); // 默认展开
     const isThinking = computed(() => props.isLoading && props.reasoning && !props.content);
     const reasoningStartTime = ref<number | null>(null);
@@ -129,6 +153,19 @@
         if (!props.reasoning) return '';
         return renderMarkdown(props.reasoning);
     });
+
+    function togglePinned() {
+        emit('pinChange', !props.isPinned);
+    }
+
+    async function copyFullMarkdown() {
+        if (!props.content) return;
+        try {
+            await navigator.clipboard.writeText(props.content);
+        } catch (error) {
+            console.error('[ResponsePanel] Failed to copy markdown:', error);
+        }
+    }
 
     // 处理代码复制按钮点击
     function handleCopyClick(event: Event) {
@@ -371,8 +408,7 @@
             'Segoe UI',
             sans-serif;
         font-weight: 600;
-        margin-top: 1.5em;
-        margin-bottom: 0.75em;
+        margin: 0.75em 0;
         color: var(--color-text-primary);
     }
 

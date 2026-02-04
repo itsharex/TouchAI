@@ -2,6 +2,7 @@
 
 <script setup lang="ts">
     import type { Attachment } from '@utils/attachment.ts';
+    import { getAttachmentSupportMessage, isAttachmentSupported } from '@utils/attachment.ts';
     import { computed } from 'vue';
 
     import SvgIcon from '@/components/common/SvgIcon.vue';
@@ -40,7 +41,21 @@
     }
 
     function handlePreview(attachment: Attachment) {
+        if (!isAttachmentSupported(attachment)) return;
         emit('preview', attachment);
+    }
+
+    function getAttachmentTitle(attachment: Attachment) {
+        return getAttachmentSupportMessage(attachment) || attachment.name;
+    }
+
+    function getAttachmentClass(attachment: Attachment) {
+        return [
+            'bg-background-primary group relative flex flex-shrink-0 items-center gap-1.5 rounded border border-gray-200 px-2 py-1 transition-colors',
+            isAttachmentSupported(attachment)
+                ? 'cursor-pointer hover:border-gray-300'
+                : 'cursor-not-allowed opacity-50 grayscale',
+        ];
     }
 
     function handleOverflowStateChange(isOpen: boolean) {
@@ -53,8 +68,8 @@
         <div
             v-for="attachment in visibleAttachments"
             :key="attachment.id"
-            :title="attachment.name"
-            class="bg-background-primary group relative flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded border border-gray-200 px-2 py-1 transition-colors hover:border-gray-300"
+            :title="getAttachmentTitle(attachment)"
+            :class="getAttachmentClass(attachment)"
             @click="handlePreview(attachment)"
         >
             <img
