@@ -7,6 +7,7 @@ mod tray;
 mod utils;
 mod window;
 
+use tauri::Manager;
 use utils::path::ensure_data_directory;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,7 +31,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             window::resize_search_window,
             window::hide_search_window,
-            window::open_file_with_default_app,
             settings::open_settings_window,
             shortcut::register_global_shortcut,
             autostart::enable_autostart,
@@ -40,6 +40,13 @@ pub fn run() {
             tray::exit_app,
         ])
         .setup(|app| {
+            // 设置窗口样式
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(e) = window::set_search_window_style(&window) {
+                    eprintln!("Failed to set rounded corners: {}", e);
+                }
+            }
+
             // 创建系统托盘
             if let Err(e) = tray::create_tray(app.handle()) {
                 eprintln!("Failed to create tray: {}", e);

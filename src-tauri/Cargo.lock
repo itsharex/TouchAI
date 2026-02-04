@@ -5635,6 +5635,7 @@ name = "touchai"
 version = "0.1.0"
 dependencies = [
  "image",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "tauri",
@@ -5646,6 +5647,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-opener",
  "tauri-plugin-sql",
+ "windows 0.58.0",
 ]
 
 [[package]]
