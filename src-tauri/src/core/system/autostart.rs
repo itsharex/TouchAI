@@ -7,8 +7,6 @@
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 
-/// 启用开机自启动
-#[tauri::command]
 pub fn enable_autostart(app: AppHandle) -> Result<(), String> {
     let autostart_manager = app.autolaunch();
     autostart_manager
@@ -16,8 +14,6 @@ pub fn enable_autostart(app: AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to enable autostart: {}", e))
 }
 
-/// 禁用开机自启动
-#[tauri::command]
 pub fn disable_autostart(app: AppHandle) -> Result<(), String> {
     let autostart_manager = app.autolaunch();
     autostart_manager
@@ -25,8 +21,6 @@ pub fn disable_autostart(app: AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to disable autostart: {}", e))
 }
 
-/// 检查是否已启用开机自启动
-#[tauri::command]
 pub fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
     let autostart_manager = app.autolaunch();
     autostart_manager

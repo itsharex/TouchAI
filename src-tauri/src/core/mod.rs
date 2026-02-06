@@ -1,0 +1,8 @@
+// Copyright (c) 2025. 千诚. Licensed under GPL v3.
+
+//! 核心功能模块
+//!
+//! 分为窗口域与系统能力域。
+
+pub mod system;
+pub mod window;

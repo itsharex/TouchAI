@@ -1,14 +1,11 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
-mod autostart;
-mod settings;
-mod shortcut;
-mod tray;
-mod utils;
-mod window;
+mod commands;
+mod core;
 
 use tauri::Manager;
-use utils::path::ensure_data_directory;
+use core::window::popup::PopupRegistry;
+use core::system::database::ensure_data_directory;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -28,47 +25,25 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_x::init())
         .plugin(tauri_plugin_fs_pro::init())
-        .invoke_handler(tauri::generate_handler![
-            window::resize_search_window,
-            window::hide_search_window,
-            settings::open_settings_window,
-            shortcut::register_global_shortcut,
-            autostart::enable_autostart,
-            autostart::disable_autostart,
-            autostart::is_autostart_enabled,
-            tray::close_tray_menu,
-            tray::exit_app,
-        ])
+        .plugin(tauri_plugin_process::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(core::system::shortcut::create_shortcut_handler())
+                .build(),
+        )
+        .manage(PopupRegistry::new())
+        .invoke_handler(commands::invoke_handler())
         .setup(|app| {
             // 设置窗口样式
             if let Some(window) = app.get_webview_window("main") {
-                if let Err(e) = window::set_search_window_style(&window) {
+                if let Err(e) = core::window::search::set_search_window_style(&window) {
                     eprintln!("Failed to set rounded corners: {}", e);
                 }
             }
 
             // 创建系统托盘
-            if let Err(e) = tray::create_tray(app.handle()) {
+            if let Err(e) = core::window::tray::create_tray(app.handle()) {
                 eprintln!("Failed to create tray: {}", e);
-            }
-
-            // 设置快捷键处理
-            let shortcut_handler = shortcut::create_shortcut_handler();
-            app.handle()
-                .plugin(
-                    tauri_plugin_global_shortcut::Builder::new()
-                        .with_handler(shortcut_handler)
-                        .build(),
-                )
-                .map_err(|e| {
-                    eprintln!("Failed to setup global shortcut plugin: {}", e);
-                    e
-                })?;
-
-            // 注册快捷键
-            if let Err(e) = shortcut::register_shortcuts(app.handle()) {
-                eprintln!("Failed to register shortcuts: {}", e);
-                return Err(e);
             }
 
             Ok(())

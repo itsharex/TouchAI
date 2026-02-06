@@ -2,17 +2,44 @@
 
 //! 快捷键处理模块
 //!
-//! 负责注册和处理全局快捷键
+//! 负责解析、注册和处理全局快捷键
 
-use crate::window;
 use tauri::AppHandle;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent};
+use tauri_plugin_global_shortcut::{
+    Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent, ShortcutState,
+};
 
-/// 当前注册的快捷键（用于取消注册）
 static mut CURRENT_SHORTCUT: Option<Shortcut> = None;
 
-/// 解析快捷键字符串（如 "Ctrl+Space", "Alt+A"）
-fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
+pub fn create_shortcut_handler() -> impl Fn(&AppHandle, &Shortcut, ShortcutEvent) {
+    move |app_handle, _received_shortcut, event| {
+        if event.state == ShortcutState::Pressed {
+            let _ = crate::core::window::toggle_search_window_visibility(app_handle);
+        }
+    }
+}
+
+pub fn register_global_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
+    let new_shortcut = parse_shortcut(&shortcut)?;
+
+    unsafe {
+        if let Some(old_shortcut) = CURRENT_SHORTCUT {
+            let _ = app.global_shortcut().unregister(old_shortcut);
+        }
+    }
+
+    app.global_shortcut()
+        .register(new_shortcut)
+        .map_err(|e| format!("Failed to register shortcut: {}", e))?;
+
+    unsafe {
+        CURRENT_SHORTCUT = Some(new_shortcut);
+    }
+
+    Ok(())
+}
+
+pub fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
     let parts: Vec<&str> = shortcut_str.split('+').map(|s| s.trim()).collect();
 
     if parts.is_empty() {
@@ -28,7 +55,6 @@ fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
             "alt" => modifiers |= Modifiers::ALT,
             "shift" => modifiers |= Modifiers::SHIFT,
             key => {
-                // 解析按键
                 key_code = Some(match key.to_lowercase().as_str() {
                     "space" => Code::Space,
                     "enter" | "return" => Code::Enter,
@@ -45,7 +71,6 @@ fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
                     "arrowdown" | "down" => Code::ArrowDown,
                     "arrowleft" | "left" => Code::ArrowLeft,
                     "arrowright" | "right" => Code::ArrowRight,
-                    // 字母键
                     "a" => Code::KeyA,
                     "b" => Code::KeyB,
                     "c" => Code::KeyC,
@@ -72,7 +97,6 @@ fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
                     "x" => Code::KeyX,
                     "y" => Code::KeyY,
                     "z" => Code::KeyZ,
-                    // 数字键
                     "0" => Code::Digit0,
                     "1" => Code::Digit1,
                     "2" => Code::Digit2,
@@ -83,7 +107,6 @@ fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
                     "7" => Code::Digit7,
                     "8" => Code::Digit8,
                     "9" => Code::Digit9,
-                    // F键
                     "f1" => Code::F1,
                     "f2" => Code::F2,
                     "f3" => Code::F3,
@@ -112,55 +135,5 @@ fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
             code,
         )),
         None => Err("No key code specified".to_string()),
-    }
-}
-
-/// 注册全局快捷键（默认 Alt+Space）
-pub fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // 默认注册 Alt+Space 快捷键
-    let alt_space = Shortcut::new(Some(Modifiers::ALT), Code::Space);
-    app.global_shortcut().register(alt_space)?;
-
-    unsafe {
-        CURRENT_SHORTCUT = Some(alt_space);
-    }
-
-    Ok(())
-}
-
-/// 注册自定义快捷键
-#[tauri::command]
-pub fn register_global_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
-    // 解析快捷键字符串
-    let new_shortcut = parse_shortcut(&shortcut)?;
-
-    // 取消注册旧的快捷键
-    unsafe {
-        if let Some(old_shortcut) = CURRENT_SHORTCUT {
-            let _ = app.global_shortcut().unregister(old_shortcut);
-        }
-    }
-
-    // 注册新的快捷键
-    app.global_shortcut()
-        .register(new_shortcut)
-        .map_err(|e| format!("Failed to register shortcut: {}", e))?;
-
-    // 保存当前快捷键
-    unsafe {
-        CURRENT_SHORTCUT = Some(new_shortcut);
-    }
-
-    Ok(())
-}
-
-/// 创建快捷键处理器
-pub fn create_shortcut_handler() -> impl Fn(&AppHandle, &Shortcut, ShortcutEvent) {
-    move |app_handle, _received_shortcut, event| {
-        // 处理任何已注册的快捷键
-        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-            // 忽略切换窗口可见性的错误
-            let _ = window::toggle_window_visibility(app_handle);
-        }
     }
 }
