@@ -5,16 +5,14 @@
 <template>
     <div ref="containerRef" class="relative mx-auto h-full w-full select-none">
         <div
-            :class="[
-                'search-bar-container bg-background-primary relative flex h-full items-center gap-3 rounded-lg p-3 backdrop-blur-xl transition-all duration-250 ease-in-out',
-                isLoading ? 'loading' : '',
-            ]"
+            class="search-bar-container relative flex h-full items-center gap-3 p-3 transition-all duration-250 ease-in-out"
             data-tauri-drag-region
             @mousedown="handleContainerMouseDown"
         >
             <div
+                ref="logoContainerRef"
                 class="logo-container flex cursor-pointer items-center justify-center"
-                @click.stop="toggleModelDropdown"
+                @click.stop.prevent="toggleModelDropdown"
             >
                 <img
                     v-if="selectedModelId || activeModel"
@@ -57,21 +55,9 @@
                 :attachments="attachments"
                 @remove="removeAttachment"
                 @preview="previewAttachment"
-                @overflow-state-change="handleAttachmentOverflowStateChange"
+                @focus-search-bar="focus"
             />
         </div>
-
-        <ModelDropdown
-            ref="modelDropdownRef"
-            :is-open="isModelDropdownOpen"
-            :active-model-id="activeModel?.model_id || ''"
-            :active-provider-id="activeModel?.provider_id ?? null"
-            :selected-model-id="selectedModelId || ''"
-            :selected-provider-id="selectedProviderId ?? null"
-            :search-query="dropdownSearchQuery"
-            @select="handleModelSelect"
-            @close="closeModelDropdown"
-        />
     </div>
 </template>
 
@@ -80,10 +66,10 @@
     import logoWord from '@assets/logo_word.svg';
     import SvgIcon from '@components/common/SvgIcon.vue';
     import AttachmentList from '@components/search/AttachmentList.vue';
-    import ModelDropdown from '@components/search/ModelDropdown.vue';
     import { findModelsWithProvider } from '@database/queries';
     import type { ModelWithProviderAndMetadata } from '@database/queries/models';
     import { aiService } from '@services/ai/manager';
+    import { popupManager } from '@services/popup';
     import { getCurrentWindow } from '@tauri-apps/api/window';
     import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
     import type { Attachment } from '@utils/attachment.ts';
@@ -97,18 +83,20 @@
 
     interface Props {
         disabled?: boolean;
-        isLoading?: boolean;
         attachments?: Attachment[];
     }
 
-    const { disabled = false, isLoading = false, attachments = [] } = defineProps<Props>();
+    const { disabled = false, attachments = [] } = defineProps<Props>();
 
     const placeholder = '写下你的需求...';
 
     const searchQuery = ref('');
     const searchInput = ref<HTMLInputElement | null>(null);
-    const modelDropdownRef = ref<InstanceType<typeof ModelDropdown> | null>(null);
     const containerRef = ref<HTMLElement | null>(null);
+    const logoContainerRef = ref<HTMLElement | null>(null);
+
+    // Popup window integration
+    const isPopupOpen = computed(() => popupManager.state.isOpen);
 
     // 保存打开下拉框前的状态
     const savedSearchQuery = ref('');
@@ -133,8 +121,6 @@
         search: [query: string];
         submit: [query: string];
         clear: [];
-        dropdownStateChange: [isOpen: boolean];
-        attachmentOverflowStateChange: [isOpen: boolean];
         modelChange: [capabilities: ModelCapabilities];
         removeAttachment: [id: string];
         dragStart: [];
@@ -154,62 +140,95 @@
     onMounted(async () => {
         await loadActiveModel();
 
-        // 添加全局点击事件监听，点击外部关闭下拉框
-        document.addEventListener('click', handleClickOutside);
+        const cleanup = await popupManager.listen({
+            onModelSelect: handleModelSelect,
+            onClose: () => {
+                isModelDropdownOpen.value = false;
+                dropdownSearchQuery.value = '';
+                restoreSearchState();
+            },
+        });
+
+        // 存储清理函数
+        onUnmounted(cleanup);
     });
-
-    onUnmounted(() => {
-        // 清理事件监听
-        document.removeEventListener('click', handleClickOutside);
-    });
-
-    // 点击外部关闭下拉框
-    function handleClickOutside(event: MouseEvent) {
-        if (!isModelDropdownOpen.value) return;
-
-        const target = event.target as Node;
-        // 如果点击的不是容器内的元素，关闭下拉框
-        if (containerRef.value && !containerRef.value.contains(target)) {
-            closeModelDropdown();
-        }
-    }
 
     function getModelLogoPath(modelId: string): string {
         const logo = getModelLogoByModelName(modelId);
         return logo ? `/src/assets/logos/models/${logo}` : logoWord;
     }
 
-    function toggleModelDropdown() {
-        console.log(
-            '[SearchBar] toggleModelDropdown called, current state:',
-            isModelDropdownOpen.value
-        );
-        if (!isModelDropdownOpen.value) {
-            // 打开下拉框：保存当前状态，清空输入框
-            savedSearchQuery.value = searchQuery.value;
-            savedCursorPosition.value = searchInput.value?.selectionStart || 0;
-            searchQuery.value = '';
-            isSearchingModel.value = true;
-            dropdownSearchQuery.value = '';
-            isModelDropdownOpen.value = true;
-            console.log('[SearchBar] Dropdown opened');
-            // 确保输入框保持焦点
-            searchInput.value?.focus();
-        } else {
-            // 关闭下拉框：恢复原始状态
+    async function toggleModelDropdown() {
+        if (!logoContainerRef.value) return;
+
+        try {
+            // toggle 会自动处理开关逻辑，添加超时保护
+            await popupManager.toggle('model-dropdown-popup', logoContainerRef.value, {
+                activeModelId: activeModel.value?.model_id || '',
+                activeProviderId: activeModel.value?.provider_id ?? null,
+                selectedModelId: selectedModelId.value || '',
+                selectedProviderId: selectedProviderId.value ?? null,
+                searchQuery: dropdownSearchQuery.value,
+            });
+
+            // 根据弹窗状态更新本地状态
+            if (isPopupOpen.value) {
+                // 弹窗打开：保存当前状态，清空输入框
+                savedSearchQuery.value = searchQuery.value;
+                savedCursorPosition.value = searchInput.value?.selectionStart || 0;
+                searchQuery.value = '';
+                isSearchingModel.value = true;
+                dropdownSearchQuery.value = '';
+                isModelDropdownOpen.value = true;
+
+                // 延迟聚焦，确保弹窗完全显示后输入框能获得焦点
+                setTimeout(() => {
+                    searchInput.value?.focus();
+                }, 100);
+            } else {
+                // 弹窗关闭：恢复搜索状态
+                isModelDropdownOpen.value = false;
+                dropdownSearchQuery.value = '';
+                restoreSearchState();
+            }
+        } catch (error) {
+            console.error('[SearchBar] Failed to toggle popup:', error);
+            isModelDropdownOpen.value = false;
+            restoreSearchState();
+        }
+    }
+
+    async function closeModelDropdown() {
+        if (!isModelDropdownOpen.value) return;
+
+        try {
+            await popupManager.hide();
             isModelDropdownOpen.value = false;
             dropdownSearchQuery.value = '';
             restoreSearchState();
-            console.log('[SearchBar] Dropdown closed');
+        } catch (error) {
+            console.error('[SearchBar] Failed to close popup:', error);
         }
-        emit('dropdownStateChange', isModelDropdownOpen.value);
     }
 
-    function closeModelDropdown() {
-        isModelDropdownOpen.value = false;
-        dropdownSearchQuery.value = '';
-        restoreSearchState();
-        emit('dropdownStateChange', false);
+    async function hideAllDropdowns() {
+        if (!isPopupOpen.value && !isModelDropdownOpen.value && !isSearchingModel.value) {
+            return;
+        }
+
+        try {
+            await popupManager.hide();
+        } catch (error) {
+            console.error('[SearchBar] Failed to hide dropdown popups before dragging:', error);
+        } finally {
+            isModelDropdownOpen.value = false;
+            dropdownSearchQuery.value = '';
+            restoreSearchState();
+        }
+    }
+
+    function isAnyDropdownOpen() {
+        return isPopupOpen.value || isModelDropdownOpen.value || isSearchingModel.value;
     }
 
     // 恢复搜索框状态
@@ -251,10 +270,7 @@
             console.error('[SearchBar] Failed to select model:', error);
         }
         // 关闭下拉框并恢复输入框状态
-        isModelDropdownOpen.value = false;
-        dropdownSearchQuery.value = '';
-        restoreSearchState();
-        emit('dropdownStateChange', false);
+        await closeModelDropdown();
     }
 
     function clearSelectedModel() {
@@ -300,28 +316,49 @@
         // 如果下拉框打开，输入内容用于搜索模型
         if (isModelDropdownOpen.value) {
             dropdownSearchQuery.value = searchQuery.value;
+            // 更新弹窗的搜索查询
+            popupManager.updateData({
+                activeModelId: activeModel.value?.model_id || '',
+                activeProviderId: activeModel.value?.provider_id ?? null,
+                selectedModelId: selectedModelId.value || '',
+                selectedProviderId: selectedProviderId.value ?? null,
+                searchQuery: dropdownSearchQuery.value,
+            });
         }
         emit('search', searchQuery.value);
     }
 
     // 打开模型下拉框
-    function openModelDropdown() {
+    async function openModelDropdown() {
+        if (!logoContainerRef.value) return;
+
         savedSearchQuery.value = searchQuery.value;
         savedCursorPosition.value = searchInput.value?.selectionStart || 0;
         searchQuery.value = '';
         isSearchingModel.value = true;
         dropdownSearchQuery.value = '';
         isModelDropdownOpen.value = true;
-        emit('dropdownStateChange', true);
-        searchInput.value?.focus();
+
+        try {
+            await popupManager.toggle('model-dropdown-popup', logoContainerRef.value, {
+                activeModelId: activeModel.value?.model_id || '',
+                activeProviderId: activeModel.value?.provider_id ?? null,
+                selectedModelId: selectedModelId.value || '',
+                selectedProviderId: selectedProviderId.value ?? null,
+                searchQuery: dropdownSearchQuery.value,
+            });
+        } catch (error) {
+            console.error('[SearchBar] Failed to open popup:', error);
+            isModelDropdownOpen.value = false;
+            restoreSearchState();
+        }
+
+        // 延迟聚焦，确保弹窗完全显示后输入框能获得焦点
+        setTimeout(() => {
+            searchInput.value?.focus();
+        }, 100);
     }
 
-    // 处理下拉框的键盘事件
-    function handleDropdownKeyDown(event: KeyboardEvent) {
-        modelDropdownRef.value?.handleKeyDown(event);
-    }
-
-    // 移除附件
     function removeAttachment(id: string) {
         emit('removeAttachment', id);
     }
@@ -331,17 +368,6 @@
             await openPath(attachment.path);
         } else {
             await revealItemInDir(attachment.path);
-        }
-    }
-
-    // 处理附件溢出下拉框状态变化
-    async function handleAttachmentOverflowStateChange(isOpen: boolean) {
-        if (isOpen) {
-            // 下拉框打开时，扩展窗口高度
-            emit('attachmentOverflowStateChange', true);
-        } else {
-            // 下拉框关闭时，恢复高度
-            emit('attachmentOverflowStateChange', false);
         }
     }
 
@@ -440,57 +466,14 @@
         selectedModelId,
         selectedProviderId,
         isModelDropdownOpen,
+        isAnyDropdownOpen,
         clearSelectedModel,
         closeModelDropdown,
+        hideAllDropdowns,
         openModelDropdown,
-        handleDropdownKeyDown,
         focus,
         clearInput,
         loadActiveModel,
         isCursorAtStart,
     });
 </script>
-
-<style scoped>
-    .search-bar-container {
-        border: 1.5px solid #d1d5db;
-    }
-
-    .search-bar-container.loading {
-        border: 2px solid transparent;
-        background-image:
-            linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
-            linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #8b5cf6, #3b82f6);
-        background-origin: border-box;
-        background-clip: padding-box, border-box;
-        animation: border-flow 1.5s linear infinite;
-    }
-
-    @keyframes border-flow {
-        0% {
-            background-image:
-                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
-                linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #8b5cf6, #3b82f6);
-        }
-        25% {
-            background-image:
-                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
-                linear-gradient(90deg, #8b5cf6, #ec4899, #8b5cf6, #3b82f6, #8b5cf6);
-        }
-        50% {
-            background-image:
-                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
-                linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6, #8b5cf6, #ec4899);
-        }
-        75% {
-            background-image:
-                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
-                linear-gradient(90deg, #8b5cf6, #3b82f6, #8b5cf6, #ec4899, #8b5cf6);
-        }
-        100% {
-            background-image:
-                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
-                linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #8b5cf6, #3b82f6);
-        }
-    }
-</style>

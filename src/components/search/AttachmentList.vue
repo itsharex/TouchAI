@@ -1,12 +1,12 @@
 <!-- Copyright (c) 2026. Qian Cheng. Licensed under GPL v3 -->
 
 <script setup lang="ts">
+    import { popupManager } from '@services/popup';
     import type { Attachment } from '@utils/attachment.ts';
     import { getAttachmentSupportMessage, isAttachmentSupported } from '@utils/attachment.ts';
-    import { computed } from 'vue';
+    import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
     import SvgIcon from '@/components/common/SvgIcon.vue';
-    import AttachmentOverflow from '@/components/search/AttachmentOverflow.vue';
 
     interface Props {
         attachments: Attachment[];
@@ -20,8 +20,11 @@
     const emit = defineEmits<{
         remove: [id: string];
         preview: [attachment: Attachment];
-        overflowStateChange: [isOpen: boolean];
+        focusSearchBar: [];
     }>();
+
+    const overflowButtonRef = ref<HTMLElement | null>(null);
+    const isOverflowOpen = ref(false);
 
     // 计算可见附件和溢出附件
     const visibleAttachments = computed(() => {
@@ -58,9 +61,69 @@
         ];
     }
 
-    function handleOverflowStateChange(isOpen: boolean) {
-        emit('overflowStateChange', isOpen);
+    async function toggleOverflowPopup() {
+        if (!overflowButtonRef.value) return;
+
+        try {
+            await popupManager.toggle('attachment-overflow-popup', overflowButtonRef.value, {
+                attachments: overflowAttachments.value,
+            });
+            isOverflowOpen.value = !isOverflowOpen.value;
+        } catch (error) {
+            console.error('[AttachmentList] Failed to toggle overflow popup:', error);
+        }
     }
+
+    function handleAttachmentAction(action: 'remove' | 'preview', attachmentId: string) {
+        const attachment = props.attachments.find((a) => a.id === attachmentId);
+        if (!attachment) return;
+
+        if (action === 'remove') {
+            handleRemove(attachmentId);
+
+            if (props.attachments.length === 0 && isOverflowOpen.value) {
+                // 附件列表为空，关闭弹窗并聚焦搜索框
+                popupManager.hide();
+                isOverflowOpen.value = false;
+                emit('focusSearchBar');
+            } else if (isOverflowOpen.value) {
+                // 还有附件，更新弹窗数据
+                popupManager.updateData({
+                    attachments: overflowAttachments.value,
+                });
+            }
+        } else {
+            handlePreview(attachment);
+        }
+    }
+
+    // 监听附件列表变化
+    watch(
+        () => props.attachments.length,
+        (newLength, oldLength) => {
+            // 如果附件从有变为无，且弹窗打开，关闭弹窗
+            if (oldLength > 0 && newLength === 0 && isOverflowOpen.value) {
+                popupManager.hide();
+                isOverflowOpen.value = false;
+                emit('focusSearchBar');
+            }
+        }
+    );
+
+    onMounted(async () => {
+        // 监听弹窗事件
+        const cleanup = await popupManager.listen({
+            onAttachmentAction: handleAttachmentAction,
+            onClose: () => {
+                isOverflowOpen.value = false;
+                // 弹窗关闭时，将焦点返回给搜索框
+                emit('focusSearchBar');
+            },
+        });
+
+        // 存储清理函数
+        onUnmounted(cleanup);
+    });
 </script>
 
 <template>
@@ -87,12 +150,13 @@
             </button>
         </div>
 
-        <AttachmentOverflow
+        <div
             v-if="hasOverflow"
-            :attachments="overflowAttachments"
-            @remove="handleRemove"
-            @preview="handlePreview"
-            @dropdown-state-change="handleOverflowStateChange"
-        />
+            ref="overflowButtonRef"
+            class="group flex h-6 w-6 cursor-pointer items-center justify-center rounded bg-gray-200 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300"
+            @click="toggleOverflowPopup"
+        >
+            <span>+{{ overflowAttachments.length }}</span>
+        </div>
     </div>
 </template>

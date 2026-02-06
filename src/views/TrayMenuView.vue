@@ -5,6 +5,7 @@
     import { invoke } from '@tauri-apps/api/core';
     import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
     import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+    import { exit } from '@tauri-apps/plugin-process';
     import { onMounted } from 'vue';
 
     interface MenuItem {
@@ -75,7 +76,7 @@
 
     async function quitApp() {
         try {
-            invoke('exit_app').then();
+            await exit(0);
         } catch (error) {
             console.error('Failed to quit app:', error);
         }

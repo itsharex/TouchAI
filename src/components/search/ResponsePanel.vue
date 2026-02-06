@@ -7,7 +7,7 @@
         <div
             ref="responseContainer"
             tabindex="0"
-            class="response-container custom-scrollbar bg-background-primary w-full overflow-y-auto rounded-lg border border-gray-300 px-10 py-5 shadow-lg backdrop-blur-xl"
+            class="response-container custom-scrollbar bg-background-primary w-full overflow-y-auto px-10 py-5"
             :style="{ maxHeight: `${maxHeight}px` }"
             @scroll="handleScroll"
         >

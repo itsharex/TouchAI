@@ -5,7 +5,9 @@
     import SearchBar from '@components/search/SearchBar.vue';
     import { useAiRequest } from '@composables/useAiRequest';
     import { useWindowResize } from '@composables/useWindowResize';
+    import { popupManager } from '@services/popup';
     import { invoke } from '@tauri-apps/api/core';
+    import { emit, listen } from '@tauri-apps/api/event';
     import { getCurrentWindow } from '@tauri-apps/api/window';
     import {
         type Attachment,
@@ -24,9 +26,11 @@
     const modelCapabilities = ref({ supportsImages: false, supportsFiles: false });
     const isPinned = ref(false);
     const isDragging = ref(false);
+
     let resizeObserver: ResizeObserver | null = null;
     let unlistenFocus: (() => void) | null = null;
     let unlistenBlur: (() => void) | null = null;
+    let unlistenPopupFocusMain: (() => void) | null = null;
 
     // 双击退格检测（仅用于取消请求）
     const lastBackspacePressTime = ref(0);
@@ -43,6 +47,29 @@
         return !(isPinned.value && hasResponse.value);
     });
 
+    /**
+     * 主窗口失焦处理
+     */
+    async function handleWindowBlur() {
+        try {
+            // 检查应用是否还有焦点
+            const appFocused = await invoke<boolean>('is_app_focused');
+
+            // 如果应用完全失去焦点
+            if (!appFocused) {
+                // 无条件执行弹窗隐藏与状态重置，避免可见性检查导致状态残留
+                await popupManager.hide();
+
+                // 隐藏主窗口
+                if (shouldHideOnBlur.value) {
+                    await invoke('hide_search_window');
+                }
+            }
+        } catch (error) {
+            console.error('[SearchView] Failed to handle window blur:', error);
+        }
+    }
+
     document.oncontextmenu = function () {
         return false;
     };
@@ -58,9 +85,6 @@
         const selectedProviderId = unref(searchBar.value?.selectedProviderId);
 
         const supportedAttachments = attachments.value.filter(isAttachmentSupported);
-        if (supportedAttachments.length > 0) {
-            console.log('[SearchView] Attachments to upload:', supportedAttachments);
-        }
 
         await sendRequest(
             query,
@@ -105,56 +129,6 @@
         syncAttachmentSupport();
     }
 
-    // 处理下拉框状态变化
-    async function handleDropdownStateChange(isOpen: boolean) {
-        if (isOpen) {
-            // 下拉框打开时，扩展窗口高度以容纳下拉框
-            // 搜索框高度 + 下拉框最大高度 + 间距
-            const dropdownHeight = 56 + 384 + 40; // 56px searchbar + 384px dropdown (max-h-96) + 40px padding
-
-            // 如果有响应内容，取当前页面高度和下拉框高度的较大值
-            if (hasResponse.value && pageContainer.value) {
-                const currentHeight = pageContainer.value.clientHeight;
-                await resizeForResponse(Math.max(currentHeight, dropdownHeight), false);
-            } else {
-                await resizeForResponse(dropdownHeight, false);
-            }
-        } else {
-            // 下拉框关闭时，恢复原始高度
-            if (!hasResponse.value) {
-                await resizeForResponse(56 + 40, true); // 只有搜索框
-            } else if (pageContainer.value) {
-                // 如果有响应内容，恢复到响应内容的实际高度
-                await resizeForResponse(pageContainer.value.clientHeight, true);
-            }
-        }
-    }
-
-    // 处理附件溢出下拉框状态变化
-    async function handleAttachmentOverflowStateChange(isOpen: boolean) {
-        if (isOpen) {
-            // 附件下拉框打开时，扩展窗口高度
-            // 搜索框高度 + 附件下拉框最大高度 + 间距
-            const overflowHeight = 56 + 320 + 40; // 56px searchbar + 320px overflow (max-h-80) + 40px padding
-
-            // 如果有响应内容，取当前页面高度和下拉框高度的较大值
-            if (hasResponse.value && pageContainer.value) {
-                const currentHeight = pageContainer.value.clientHeight;
-                await resizeForResponse(Math.max(currentHeight, overflowHeight), false);
-            } else {
-                await resizeForResponse(overflowHeight, false);
-            }
-        } else {
-            // 下拉框关闭时，恢复原始高度
-            if (!hasResponse.value) {
-                await resizeForResponse(56 + 40, true);
-            } else if (pageContainer.value) {
-                await resizeForResponse(pageContainer.value.clientHeight, true);
-            }
-        }
-    }
-
-    // 清空输入框和回复
     function clearAll() {
         searchQuery.value = '';
         reset();
@@ -165,6 +139,21 @@
     function cancelRequest() {
         if (isLoading.value) {
             cancel();
+        }
+    }
+
+    function handleSearchWindowMouseDown(event: MouseEvent) {
+        const target = event.target as HTMLElement | null;
+
+        // 模型图标点击由自身 toggle 逻辑处理，避免被这里提前关闭后又重新打开
+        if (target?.closest('.logo-container')) {
+            return;
+        }
+
+        if (searchBar.value?.isAnyDropdownOpen?.()) {
+            searchBar.value?.hideAllDropdowns?.();
+            event.preventDefault();
+            event.stopPropagation();
         }
     }
 
@@ -227,26 +216,23 @@
             return;
         }
 
-        // 如果下拉框打开，处理相关按键
+        // 如果模型下拉框打开，方向键和 Enter 键转发到弹窗
         if (searchBar.value?.isModelDropdownOpen) {
-            // 箭头键和 Enter 键交给下拉框处理
             if (['ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) {
                 event.preventDefault();
-                searchBar.value?.handleDropdownKeyDown(event);
+                // 通过 Tauri 事件转发键盘事件到弹窗
+                emit('popup-keydown', { key: event.key });
                 return;
             }
-            // 其他可输入字符，确保焦点在输入框上
-            if (event.key.length === 1 || event.key === 'Backspace') {
-                searchBar.value?.focus();
-            }
-        } else {
+        }
+
+        if (!searchBar.value?.isModelDropdownOpen) {
             if (['ArrowUp', 'ArrowDown'].includes(event.key)) {
                 responseDisplay.value?.focus();
                 return;
             }
         }
 
-        // Backspace 键处理
         if (event.key === 'Backspace') {
             // 如果下拉框打开，关闭下拉框
             if (searchBar.value?.isModelDropdownOpen) {
@@ -315,9 +301,19 @@
             searchBar.value?.loadActiveModel();
         });
 
+        // 监听主窗口失焦
         unlistenBlur = await getCurrentWindow().listen('tauri://blur', async () => {
-            if (!shouldHideOnBlur.value) return;
-            await invoke('hide_search_window');
+            await handleWindowBlur();
+        });
+
+        // 监听弹窗请求主窗口获得焦点的事件
+        unlistenPopupFocusMain = await listen('popup-focus-main', async () => {
+            // 将焦点设置到主窗口
+            await getCurrentWindow().setFocus();
+            // 延迟聚焦搜索框
+            setTimeout(() => {
+                searchBar.value?.focus();
+            }, 50);
         });
     }
 
@@ -364,12 +360,15 @@
         // 添加全局键盘事件监听
         window.addEventListener('keydown', handleKeyDown);
 
+        document.addEventListener('mousedown', handleSearchWindowMouseDown, true);
         document.body.addEventListener('click', handleSearchWindowClick);
     });
 
     onUnmounted(() => {
         // 清理全局键盘事件监听
         window.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('mousedown', handleSearchWindowMouseDown, true);
+        document.body.removeEventListener('click', handleSearchWindowClick);
 
         // 清理窗口焦点监听
         if (unlistenFocus) {
@@ -379,6 +378,10 @@
         if (unlistenBlur) {
             unlistenBlur();
             unlistenBlur = null;
+        }
+        if (unlistenPopupFocusMain) {
+            unlistenPopupFocusMain();
+            unlistenPopupFocusMain = null;
         }
 
         // 清理 ResizeObserver
@@ -392,33 +395,78 @@
 <template>
     <div
         ref="pageContainer"
-        class="flex w-screen flex-col items-center justify-start bg-transparent"
+        :class="[
+            'search-view-container bg-background-primary flex w-screen flex-col items-center justify-start overflow-hidden rounded-lg backdrop-blur-xl',
+            isLoading ? 'loading' : '',
+        ]"
         @paste="handlePaste"
     >
         <SearchBar
             ref="searchBar"
             :disabled="isLoading"
-            :is-loading="isLoading"
             :attachments="attachments"
             @search="handleSearch"
             @submit="handleSubmit"
             @clear="handleClear"
             @remove-attachment="handleRemoveAttachment"
-            @dropdown-state-change="handleDropdownStateChange"
-            @attachment-overflow-state-change="handleAttachmentOverflowStateChange"
             @model-change="handleModelChange"
             @drag-start="isDragging = true"
             @drag-end="isDragging = false"
         />
-        <ResponsePanel
-            v-if="hasResponse"
-            ref="responseDisplay"
-            :content="response"
-            :reasoning="reasoning"
-            :is-loading="isLoading"
-            :error="error"
-            :is-pinned="isPinned"
-            @pin-change="(value: boolean) => (isPinned = value)"
-        />
+        <div v-if="hasResponse" class="w-full border-t-[0.5px] border-gray-300/80">
+            <ResponsePanel
+                ref="responseDisplay"
+                :content="response"
+                :reasoning="reasoning"
+                :is-loading="isLoading"
+                :error="error"
+                :is-pinned="isPinned"
+                @pin-change="(value: boolean) => (isPinned = value)"
+            />
+        </div>
     </div>
 </template>
+
+<style scoped>
+    .search-view-container {
+        border: 1.5px solid #d1d5db;
+    }
+
+    .search-view-container.loading {
+        border: 2px solid transparent;
+        background-image:
+            linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
+            linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #8b5cf6, #3b82f6);
+        background-origin: border-box;
+        background-clip: padding-box, border-box;
+        animation: border-flow 1.5s linear infinite;
+    }
+
+    @keyframes border-flow {
+        0% {
+            background-image:
+                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
+                linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #8b5cf6, #3b82f6);
+        }
+        25% {
+            background-image:
+                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
+                linear-gradient(90deg, #8b5cf6, #ec4899, #8b5cf6, #3b82f6, #8b5cf6);
+        }
+        50% {
+            background-image:
+                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
+                linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6, #8b5cf6, #ec4899);
+        }
+        75% {
+            background-image:
+                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
+                linear-gradient(90deg, #8b5cf6, #3b82f6, #8b5cf6, #ec4899, #8b5cf6);
+        }
+        100% {
+            background-image:
+                linear-gradient(rgba(251, 251, 246, 0.98), rgba(251, 251, 246, 0.98)),
+                linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #8b5cf6, #3b82f6);
+        }
+    }
+</style>
