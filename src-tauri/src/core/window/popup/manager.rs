@@ -27,7 +27,7 @@ pub fn build_popup_window(
             .skip_taskbar(true)
             .resizable(false)
             .visible(false)
-            .shadow(false)
+            .shadow(true)
             .focused(false)
             .focusable(false)
     };

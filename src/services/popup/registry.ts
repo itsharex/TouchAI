@@ -72,10 +72,8 @@ export function initializeBuiltInPopups(): void {
         height: 384,
         component: ModelDropdownPopup,
         calculatePosition: (triggerElement, mainWindow) => {
-            const searchContainer =
-                triggerElement.closest('.search-view-container') ||
-                triggerElement.closest('.search-bar-container');
-            const searchBarHeight = searchContainer?.getBoundingClientRect().height || 0;
+            const searchBarContainer = triggerElement.closest('.search-bar-container');
+            const searchBarHeight = searchBarContainer?.getBoundingClientRect().height || 60;
 
             return {
                 x: mainWindow.position.x,
@@ -91,10 +89,8 @@ export function initializeBuiltInPopups(): void {
         height: 320,
         component: AttachmentOverflowPopup,
         calculatePosition: (triggerElement, mainWindow, dimensions) => {
-            const searchContainer =
-                triggerElement.closest('.search-view-container') ||
-                triggerElement.closest('.search-bar-container');
-            const searchBarHeight = searchContainer?.getBoundingClientRect().height || 0;
+            const searchBarContainer = triggerElement.closest('.search-bar-container');
+            const searchBarHeight = searchBarContainer?.getBoundingClientRect().height || 60;
 
             return {
                 x: mainWindow.position.x + mainWindow.size.width - dimensions.width,
