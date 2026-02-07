@@ -400,13 +400,7 @@
     .response-text :deep(h4),
     .response-text :deep(h5),
     .response-text :deep(h6) {
-        font-family:
-            'Source Han Sans SC',
-            'Noto Sans SC',
-            -apple-system,
-            BlinkMacSystemFont,
-            'Segoe UI',
-            sans-serif;
+        font-family: var(--font-serif);
         font-weight: 600;
         margin: 0.75em 0;
         color: var(--color-text-primary);
@@ -478,7 +472,7 @@
     /* Reasoning 内容样式 */
     .reasoning-content {
         font-family:
-            'Source Han Sans SC',
+            'Source Han Sans CN',
             'Noto Sans SC',
             -apple-system,
             BlinkMacSystemFont,
