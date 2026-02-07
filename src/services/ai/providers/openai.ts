@@ -1,5 +1,6 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
+import { createTauriFetch } from '@utils/tauri-fetch';
 import OpenAI from 'openai';
 
 import type {
@@ -56,6 +57,7 @@ export class OpenAiProvider implements AiProvider {
             apiKey: config.apiKey,
             baseURL: config.apiEndpoint,
             dangerouslyAllowBrowser: true,
+            fetch: createTauriFetch(),
         });
     }
 

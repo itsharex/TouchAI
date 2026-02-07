@@ -1,6 +1,7 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
 import Anthropic from '@anthropic-ai/sdk';
+import { createTauriFetch } from '@utils/tauri-fetch';
 
 import type {
     AiProvider,
@@ -74,6 +75,7 @@ export class AnthropicProvider implements AiProvider {
             apiKey: config.apiKey,
             baseURL: config.apiEndpoint,
             dangerouslyAllowBrowser: true,
+            fetch: createTauriFetch(),
         });
     }
 

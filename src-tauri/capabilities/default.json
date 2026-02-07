@@ -34,6 +34,17 @@
     "clipboard-x:default",
     "fs-pro:default",
     {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://**"
+        },
+        {
+          "url": "http://**"
+        }
+      ]
+    },
+    {
       "identifier": "opener:allow-open-path",
       "allow": [
         {

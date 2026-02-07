@@ -18,6 +18,7 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .plugin(tauri_plugin_sql::Builder::new().build())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_x::init())
         .plugin(tauri_plugin_fs_pro::init())
