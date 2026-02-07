@@ -1,21 +1,17 @@
-// Copyright (c) 2025. 千诚. Licensed under GPL v3
+// Copyright (c) 2025. Qian Cheng. Licensed under GPL v3
 
 mod commands;
 mod core;
 
-use tauri::Manager;
-use core::window::popup::PopupRegistry;
 use core::system::database::ensure_data_directory;
+use core::window::popup::PopupRegistry;
+use log::{error, info, warn};
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 确保数据目录存在
-    if let Err(e) = ensure_data_directory() {
-        eprintln!("Failed to create data directory: {}", e);
-        std::process::exit(1);
-    }
-
-    tauri::Builder::default()
+    let app_result = tauri::Builder::default()
+        .plugin(core::system::logging::build_plugin())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -34,24 +30,33 @@ pub fn run() {
         .manage(PopupRegistry::new())
         .invoke_handler(commands::invoke_handler())
         .setup(|app| {
-            // 设置窗口样式
-            if let Some(window) = app.get_webview_window("main") {
-                if let Err(e) = core::window::search::set_search_window_style(&window) {
-                    eprintln!("Failed to set rounded corners: {}", e);
+            match ensure_data_directory() {
+                Ok(data_dir) => {
+                    info!("Data directory ready: {}", data_dir.display());
+                }
+                Err(err) => {
+                    error!("Failed to create data directory: {}", err);
+                    return Err(Box::new(std::io::Error::other(err.to_string())));
                 }
             }
 
-            // 创建系统托盘
-            if let Err(e) = core::window::tray::create_tray(app.handle()) {
-                eprintln!("Failed to create tray: {}", e);
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(err) = core::window::search::set_search_window_style(&window) {
+                    warn!("Failed to set rounded corners: {}", err);
+                }
+            }
+
+            if let Err(err) = core::window::tray::create_tray(app.handle()) {
+                warn!("Failed to create tray: {}", err);
             }
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .map_err(|e| {
-            eprintln!("Error while running tauri application: {}", e);
-            e
-        })
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!());
+
+    if let Err(err) = app_result {
+        error!("Error while running tauri application: {}", err);
+        panic!("error while running tauri application: {}", err);
+    }
 }
+

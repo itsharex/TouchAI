@@ -2,6 +2,7 @@
 
 //! 数据库模块
 
+use log::info;
 use std::fs;
 use std::path::PathBuf;
 
@@ -12,7 +13,7 @@ pub fn ensure_data_directory() -> Result<PathBuf, Box<dyn std::error::Error>> {
         .ok_or("Failed to get executable directory")?
         .to_path_buf();
 
-    let data_dir = if exe_dir.ends_with("debug") || exe_dir.ends_with("release") {
+    let data_dir = if cfg!(debug_assertions) {
         exe_dir
             .parent()
             .and_then(|p| p.parent())
@@ -25,7 +26,7 @@ pub fn ensure_data_directory() -> Result<PathBuf, Box<dyn std::error::Error>> {
 
     if !data_dir.exists() {
         fs::create_dir_all(&data_dir)?;
-        println!("Created data directory at: {}", data_dir.display());
+        info!("Created data directory at: {}", data_dir.display());
     }
 
     Ok(data_dir)

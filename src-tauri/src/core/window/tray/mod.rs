@@ -2,6 +2,7 @@
 
 //! 系统托盘模块。
 
+use log::warn;
 use tauri::{
     image::Image,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -23,7 +24,7 @@ pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             } => {
                 let app = tray.app_handle();
                 if let Err(e) = show_tray_menu(app, position) {
-                    eprintln!("Failed to show tray menu: {}", e);
+                    warn!("Failed to show tray menu: {}", e);
                 }
             }
             TrayIconEvent::Click {

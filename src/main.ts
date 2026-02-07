@@ -8,6 +8,7 @@ import { getSettingValue, setSetting } from '@database/queries';
 import { popupManager } from '@services/popup';
 import { invoke } from '@tauri-apps/api/core';
 import { setupLinkInterceptor } from '@utils/linkInterceptor';
+import { initializeLogger } from '@utils/logger.ts';
 import { createApp } from 'vue';
 
 import App from './App.vue';
@@ -37,22 +38,25 @@ async function initializeGlobalShortcut() {
  * 初始化应用
  */
 async function initializeApp() {
-    // 1. 初始化数据库连接，数据库连接为必须，因此阻塞等待
+    // 1. 初始化日志挂载
+    initializeLogger();
+
+    // 2. 初始化数据库连接，数据库连接为必须，因此阻塞等待
     await db.init();
 
-    // 2. 初始化全局快捷键
+    // 3. 初始化全局快捷键
     initializeGlobalShortcut().catch(console.error);
 
-    // 3. 初始化 Alert 系统
+    // 4. 初始化 Alert 系统
     useAlert();
 
-    // 4. 启用链接拦截器（禁止外部链接跳转）
+    // 5. 启用链接拦截器（禁止外部链接跳转）
     setupLinkInterceptor();
 
-    // 5. 初始化Popup
+    // 6. 初始化Popup
     popupManager.initialize().catch(console.error);
 
-    // 6. 创建并挂载 Vue 应用
+    // 7. 创建并挂载 Vue 应用
     const app = createApp(App);
     app.use(router);
     app.mount('#app');

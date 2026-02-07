@@ -48,7 +48,10 @@
       "scope": {
         "allowed": [
           {
-            "path": "data/touchai.db"
+            "path": "../data/touchai.db"
+          },
+          {
+            "path": "./data/touchai.db"
           }
         ]
       }

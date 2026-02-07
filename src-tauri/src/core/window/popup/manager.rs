@@ -3,6 +3,7 @@
 //! 弹窗管理逻辑。
 
 use crate::core::window::popup::PopupRegistry;
+use log::warn;
 use tauri::{AppHandle, Manager};
 
 pub fn build_popup_window(
@@ -67,7 +68,7 @@ pub async fn preload_popup_windows(app: AppHandle, registry: &PopupRegistry) -> 
             ) {
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("[PopupRegistry] Failed to create {} popup: {}", config.id, e);
+                    warn!("[PopupRegistry] Failed to create {} popup: {}", config.id, e);
                 }
             }
         }
