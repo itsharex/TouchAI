@@ -15,7 +15,10 @@ import type { Database as DatabaseSchema, DatabaseOptions } from './schema';
 class DatabaseManager {
     private tauriDb: Database | null = null;
     private kyselyDb: Kysely<DatabaseSchema> | null = null;
-    private dbPath: string = 'sqlite://../data/touchai.db';
+    private dbPath: string =
+        import.meta.env.MODE === 'production'
+            ? 'sqlite://./data/touchai.db'
+            : 'sqlite://../data/touchai.db';
     private migrationManager: MigrationManager | null = null;
     private initialized: boolean = false;
     private initPromise: Promise<void> | null = null;
