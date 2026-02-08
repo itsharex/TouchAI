@@ -1,85 +1,79 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
-import { UpdateResult } from 'kysely';
+import { and, asc, count, desc, eq, like } from 'drizzle-orm';
 
 import { db } from '../index';
 import type { Message, MessageRole, MessageUpdate, NewMessage } from '../schema';
+import { messages, sessions } from '../schema';
 
 /**
  * 根据 ID 查找消息
  */
 export const findMessageById = async (id: number) =>
-    (await db.getKysely())
-        .selectFrom('messages')
-        .selectAll()
-        .where('id', '=', id)
-        .executeTakeFirst();
+    (await db.getDb()).select().from(messages).where(eq(messages.id, id)).get();
 
 /**
  * 根据会话 ID 查找所有消息
  */
 export const findMessagesBySessionId = async (sessionId: number) =>
-    (await db.getKysely())
-        .selectFrom('messages')
-        .selectAll()
-        .where('session_id', '=', sessionId)
-        .orderBy('created_at', 'asc')
-        .execute();
+    (await db.getDb())
+        .select()
+        .from(messages)
+        .where(eq(messages.session_id, sessionId))
+        .orderBy(asc(messages.created_at))
+        .all();
 
 /**
  * 根据会话 ID 和角色查找消息
  */
 export const findMessagesBySessionIdAndRole = async (sessionId: number, role: MessageRole) =>
-    (await db.getKysely())
-        .selectFrom('messages')
-        .selectAll()
-        .where('session_id', '=', sessionId)
-        .where('role', '=', role)
-        .orderBy('created_at', 'asc')
-        .execute();
+    (await db.getDb())
+        .select()
+        .from(messages)
+        .where(and(eq(messages.session_id, sessionId), eq(messages.role, role)))
+        .orderBy(asc(messages.created_at))
+        .all();
 
 /**
  * 获取会话的最新消息
  */
 export const getLatestMessages = async (sessionId: number, limit: number = 10) =>
-    (await db.getKysely())
-        .selectFrom('messages')
-        .selectAll()
-        .where('session_id', '=', sessionId)
-        .orderBy('created_at', 'desc')
+    (await db.getDb())
+        .select()
+        .from(messages)
+        .where(eq(messages.session_id, sessionId))
+        .orderBy(desc(messages.created_at))
         .limit(limit)
-        .execute();
+        .all();
 
 /**
  * 搜索消息
  */
 export const searchMessages = async (keyword: string, sessionId?: number) => {
     const pattern = `%${keyword}%`;
-    let query = (await db.getKysely())
-        .selectFrom('messages')
-        .selectAll()
-        .where('content', 'like', pattern);
+    const drizzle = await db.getDb();
+    let query = drizzle.select().from(messages).where(like(messages.content, pattern)).$dynamic();
 
     if (sessionId !== undefined) {
-        query = query.where('session_id', '=', sessionId);
+        query = query.where(eq(messages.session_id, sessionId));
     }
 
-    return query.orderBy('created_at', 'desc').execute();
+    return query.orderBy(desc(messages.created_at)).all();
 };
 
 /**
  * 创建消息
  */
 export const createMessage = async (data: NewMessage): Promise<Message> => {
-    await (await db.getKysely()).insertInto('messages').values(data).execute();
+    const drizzle = await db.getDb();
+    await drizzle.insert(messages).values(data).run();
 
-    // 获取最后插入的记录
-    const lastInsert = await (await db.getKysely())
-        .selectFrom('messages')
-        .selectAll()
-        .orderBy('id', 'desc')
+    const lastInsert = await drizzle
+        .select()
+        .from(messages)
+        .orderBy(desc(messages.id))
         .limit(1)
-        .executeTakeFirst();
+        .get();
 
     if (!lastInsert) {
         throw new Error('Failed to create message');
@@ -91,15 +85,15 @@ export const createMessage = async (data: NewMessage): Promise<Message> => {
  * 批量创建消息
  */
 export const createMessages = async (data: NewMessage[]): Promise<Message[]> => {
-    await (await db.getKysely()).insertInto('messages').values(data).execute();
+    const drizzle = await db.getDb();
+    await drizzle.insert(messages).values(data).run();
 
-    // 获取最后插入的记录
-    const lastInserts = await (await db.getKysely())
-        .selectFrom('messages')
-        .selectAll()
-        .orderBy('id', 'desc')
+    const lastInserts = await drizzle
+        .select()
+        .from(messages)
+        .orderBy(desc(messages.id))
         .limit(data.length)
-        .execute();
+        .all();
 
     return lastInserts;
 };
@@ -107,55 +101,34 @@ export const createMessages = async (data: NewMessage[]): Promise<Message[]> => 
 /**
  * 更新消息
  */
-export const updateMessage = async (id: number, data: MessageUpdate): Promise<UpdateResult> => {
-    const result = await (await db.getKysely())
-        .updateTable('messages')
-        .set(data)
-        .where('id', '=', id)
-        .executeTakeFirst();
-
-    if (!result || result.numUpdatedRows === 0n) {
-        throw new Error(`Message with id ${id} not found`);
-    }
-
-    return result;
+export const updateMessage = async (id: number, data: MessageUpdate): Promise<void> => {
+    await (await db.getDb()).update(messages).set(data).where(eq(messages.id, id)).run();
 };
 
 /**
  * 删除消息
  */
 export const deleteMessage = async (id: number): Promise<boolean> => {
-    const result = await (await db.getKysely())
-        .deleteFrom('messages')
-        .where('id', '=', id)
-        .executeTakeFirst();
-
-    return Number(result.numDeletedRows) > 0;
+    await (await db.getDb()).delete(messages).where(eq(messages.id, id)).run();
+    return true;
 };
 
 /**
  * 删除会话的所有消息
  */
-export const deleteMessagesBySessionId = async (sessionId: number): Promise<number> => {
-    const result = await (await db.getKysely())
-        .deleteFrom('messages')
-        .where('session_id', '=', sessionId)
-        .executeTakeFirst();
-
-    return Number(result.numDeletedRows);
+export const deleteMessagesBySessionId = async (sessionId: number): Promise<void> => {
+    await (await db.getDb()).delete(messages).where(eq(messages.session_id, sessionId)).run();
 };
 
 /**
  * 统计会话的消息数
  */
 export const countMessagesBySessionId = async (sessionId: number): Promise<number> => {
-    const result = await (
-        await db.getKysely()
-    )
-        .selectFrom('messages')
-        .select((eb) => eb.fn.countAll<number>().as('count'))
-        .where('session_id', '=', sessionId)
-        .executeTakeFirst();
+    const result = await (await db.getDb())
+        .select({ count: count() })
+        .from(messages)
+        .where(eq(messages.session_id, sessionId))
+        .get();
 
     return result?.count || 0;
 };
@@ -164,12 +137,7 @@ export const countMessagesBySessionId = async (sessionId: number): Promise<numbe
  * 统计所有消息数
  */
 export const countMessages = async (): Promise<number> => {
-    const result = await (
-        await db.getKysely()
-    )
-        .selectFrom('messages')
-        .select((eb) => eb.fn.countAll<number>().as('count'))
-        .executeTakeFirst();
+    const result = await (await db.getDb()).select({ count: count() }).from(messages).get();
 
     return result?.count || 0;
 };
@@ -177,28 +145,26 @@ export const countMessages = async (): Promise<number> => {
 /**
  * 删除所有消息
  */
-export const deleteAllMessages = async (): Promise<number> => {
-    const result = await (await db.getKysely()).deleteFrom('messages').executeTakeFirst();
-
-    return Number(result.numDeletedRows);
+export const deleteAllMessages = async (): Promise<void> => {
+    await (await db.getDb()).delete(messages).run();
 };
 
 /**
  * 获取消息及会话信息（JOIN 查询）
  */
 export const findMessageWithSession = async (messageId: number) =>
-    (await db.getKysely())
-        .selectFrom('messages')
-        .innerJoin('sessions', 'sessions.id', 'messages.session_id')
-        .select([
-            'messages.id',
-            'messages.session_id',
-            'messages.role',
-            'messages.content',
-            'messages.created_at',
-            'messages.updated_at',
-            'sessions.title as session_title',
-            'sessions.model as session_model',
-        ])
-        .where('messages.id', '=', messageId)
-        .executeTakeFirst();
+    (await db.getDb())
+        .select({
+            id: messages.id,
+            session_id: messages.session_id,
+            role: messages.role,
+            content: messages.content,
+            created_at: messages.created_at,
+            updated_at: messages.updated_at,
+            session_title: sessions.title,
+            session_model: sessions.model,
+        })
+        .from(messages)
+        .innerJoin(sessions, eq(sessions.id, messages.session_id))
+        .where(eq(messages.id, messageId))
+        .get();

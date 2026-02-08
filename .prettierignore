@@ -5,6 +5,9 @@ build/
 *.min.*
 coverage/
 
+# Drizzle 生成的迁移文件
+drizzle/
+
 # 配置文件（保持原样）
 *.config.js
 *.config.ts

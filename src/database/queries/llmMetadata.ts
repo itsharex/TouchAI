@@ -1,18 +1,20 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
+import { count, eq } from 'drizzle-orm';
+
 import { db } from '../index';
 import type { LlmMetadata, LlmMetadataUpdate, NewLlmMetadata } from '../schema';
+import { llmMetadata } from '../schema';
 
 /**
  * 根据 model_id 查询 LLM 元数据
  */
 export async function findLlmMetadataByModelId(modelId: string): Promise<LlmMetadata | null> {
-    const kysely = await db.getKysely();
-    const result = await kysely
-        .selectFrom('llm_metadata')
-        .selectAll()
-        .where('model_id', '=', modelId)
-        .executeTakeFirst();
+    const result = await (await db.getDb())
+        .select()
+        .from(llmMetadata)
+        .where(eq(llmMetadata.model_id, modelId))
+        .get();
 
     return result || null;
 }
@@ -24,36 +26,30 @@ export async function findLlmMetadataByModelId(modelId: string): Promise<LlmMeta
 export async function insertLlmMetadata(metadata: NewLlmMetadata[]): Promise<void> {
     if (metadata.length === 0) return;
 
-    const kysely = await db.getKysely();
-
-    // 使用 onConflict 处理重复的 model_id
-    await kysely
-        .insertInto('llm_metadata')
+    await (await db.getDb())
+        .insert(llmMetadata)
         .values(metadata)
-        .onConflict((oc) => oc.column('model_id').doNothing())
-        .execute();
+        .onConflictDoNothing({ target: llmMetadata.model_id })
+        .run();
 }
 
 /**
  * 更新或创建 LLM 元数据
  */
 export async function upsertLlmMetadata(modelId: string, data: LlmMetadataUpdate): Promise<void> {
-    const kysely = await db.getKysely();
-
-    // 检查是否存在
     const existing = await findLlmMetadataByModelId(modelId);
 
     if (existing) {
-        // 更新
-        await kysely
-            .updateTable('llm_metadata')
+        await (await db.getDb())
+            .update(llmMetadata)
             .set(data)
-            .where('model_id', '=', modelId)
-            .execute();
+            .where(eq(llmMetadata.model_id, modelId))
+            .run();
     } else {
-        // 创建
-        await kysely
-            .insertInto('llm_metadata')
+        await (
+            await db.getDb()
+        )
+            .insert(llmMetadata)
             .values({
                 model_id: modelId,
                 name: modelId,
@@ -65,7 +61,7 @@ export async function upsertLlmMetadata(modelId: string, data: LlmMetadataUpdate
                 tool_call: 0,
                 ...data,
             })
-            .execute();
+            .run();
     }
 }
 
@@ -73,19 +69,14 @@ export async function upsertLlmMetadata(modelId: string, data: LlmMetadataUpdate
  * 清空 LLM 元数据表
  */
 export async function clearLlmMetadata(): Promise<void> {
-    const kysely = await db.getKysely();
-    await kysely.deleteFrom('llm_metadata').execute();
+    await (await db.getDb()).delete(llmMetadata).run();
 }
 
 /**
  * 检查 LLM 元数据表是否为空
  */
 export async function isLlmMetadataEmpty(): Promise<boolean> {
-    const kysely = await db.getKysely();
-    const result = await kysely
-        .selectFrom('llm_metadata')
-        .select(kysely.fn.count<number>('id').as('count'))
-        .executeTakeFirst();
+    const result = await (await db.getDb()).select({ count: count() }).from(llmMetadata).get();
 
     return (result?.count ?? 0) === 0;
 }

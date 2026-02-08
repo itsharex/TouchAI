@@ -212,7 +212,7 @@
     // 保存快捷键到数据库并注册
     const saveShortcutToDatabase = async (shortcut: string) => {
         try {
-            await setSetting('global_shortcut', shortcut, '全局快捷键');
+            await setSetting('global_shortcut', shortcut);
         } catch (error) {
             console.error('Failed to save shortcut to database:', error);
             throw error;
@@ -223,7 +223,7 @@
     const saveOtherSettings = async () => {
         try {
             // 保存开机自启动设置
-            await setSetting('start_on_boot', settings.value.startOnBoot.toString(), '开机自启动');
+            await setSetting('start_on_boot', settings.value.startOnBoot.toString());
 
             // 同步到系统
             if (settings.value.startOnBoot) {
@@ -232,11 +232,7 @@
                 await invoke('disable_autostart');
             }
 
-            await setSetting(
-                'start_minimized',
-                settings.value.startMinimized.toString(),
-                '启动时最小化'
-            );
+            await setSetting('start_minimized', settings.value.startMinimized.toString());
         } catch (error) {
             console.error('Failed to save settings:', error);
             alertMessage.value?.error('保存设置失败', 3000);
@@ -256,7 +252,7 @@
             const isEnabled = await invoke<boolean>('is_autostart_enabled');
             if (isEnabled !== settings.value.startOnBoot) {
                 settings.value.startOnBoot = isEnabled;
-                await setSetting('start_on_boot', isEnabled.toString(), '开机自启动');
+                await setSetting('start_on_boot', isEnabled.toString());
             }
         } catch (error) {
             console.error('Failed to check autostart status:', error);

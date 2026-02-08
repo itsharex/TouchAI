@@ -18,7 +18,9 @@
         "lint": "eslint . --fix",
         "format:check": "prettier --check . --ignore-path .prettierignore",
         "format:fix": "prettier --write . --ignore-path .prettierignore",
-        "prepare": "husky"
+        "prepare": "husky",
+        "db:generate": "drizzle-kit generate",
+        "db:studio": "drizzle-kit studio"
     },
     "dependencies": {
         "@anthropic-ai/sdk": "^0.71.2",
@@ -32,9 +34,9 @@
         "@tauri-apps/plugin-process": "^2.2.0",
         "@tauri-apps/plugin-sql": "^2.3.1",
         "@vscode/markdown-it-katex": "^1.1.2",
+        "drizzle-orm": "^0.45.1",
         "highlight.js": "^11.11.1",
         "katex": "^0.16.28",
-        "kysely": "^0.28.10",
         "markdown-it": "^14.1.0",
         "markdown-it-abbr": "^2.0.0",
         "markdown-it-deflist": "^3.0.0",
@@ -61,6 +63,7 @@
         "@vitejs/plugin-vue": "^5.2.1",
         "@vitest/ui": "^4.0.15",
         "@vue/test-utils": "^2.4.6",
+        "drizzle-kit": "^0.31.8",
         "eslint": "^9.39.1",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.4",

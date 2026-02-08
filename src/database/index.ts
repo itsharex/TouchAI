@@ -1,25 +1,23 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
 import Database from '@tauri-apps/plugin-sql';
-import type { Kysely } from 'kysely';
-import { Kysely as KyselyInstance } from 'kysely';
 
-import { createTauriSqlDialect } from './dialect';
-import { MigrationManager } from './migrations';
-import type { Database as DatabaseSchema, DatabaseOptions } from './schema';
+import type { DrizzleDb } from './driver';
+import { createDrizzleDb } from './driver';
+import { migrate } from './migrator';
+import type { DatabaseOptions, SqlValue } from './schema';
+import { seed } from './seed';
 
 /**
  * 数据库管理类
- * 提供数据库连接、Kysely 实例管理
  */
 class DatabaseManager {
     private tauriDb: Database | null = null;
-    private kyselyDb: Kysely<DatabaseSchema> | null = null;
+    private drizzleDb: DrizzleDb | null = null;
     private dbPath: string =
         import.meta.env.MODE === 'production'
             ? 'sqlite://./data/touchai.db'
             : 'sqlite://../data/touchai.db';
-    private migrationManager: MigrationManager | null = null;
     private initialized: boolean = false;
     private initPromise: Promise<void> | null = null;
 
@@ -28,12 +26,12 @@ class DatabaseManager {
      * @param options 数据库配置选项
      */
     async init(options?: DatabaseOptions): Promise<void> {
-        // 如果已经在初始化中，返回现有的 Promise
+        // 防止并发初始化：如果已经在初始化中，返回现有的 Promise
         if (this.initPromise) {
             return this.initPromise;
         }
 
-        // 如果已经初始化完成，直接返回
+        // 防止重复初始化
         if (this.initialized) {
             console.warn('Database already initialized');
             return;
@@ -46,14 +44,14 @@ class DatabaseManager {
                 this.tauriDb = await Database.load(this.dbPath);
                 console.log(`Database initialized: ${this.dbPath}`);
 
-                // 创建 Kysely 实例
-                this.kyselyDb = new KyselyInstance<DatabaseSchema>({
-                    dialect: createTauriSqlDialect(this.tauriDb),
-                });
+                // 运行迁移（创建/更新表结构）
+                await migrate(this.tauriDb);
 
-                // 创建迁移管理器并运行迁移
-                this.migrationManager = new MigrationManager(this.tauriDb);
-                await this.migrationManager.runMigrations();
+                // 运行种子数据（插入默认配置）
+                await seed(this.tauriDb);
+
+                // 创建 Drizzle 实例
+                this.drizzleDb = createDrizzleDb(this.tauriDb);
 
                 this.initialized = true;
             } catch (error) {
@@ -67,11 +65,11 @@ class DatabaseManager {
     }
 
     /**
-     * 获取 Kysely 数据库实例
-     * 自动等待初始化完成
-     * @returns Kysely 实例
+     * 获取 Drizzle 数据库实例
+     * 自动等待初始化完成，未初始化时自动触发初始化
+     * @returns Drizzle 实例
      */
-    async getKysely(): Promise<Kysely<DatabaseSchema>> {
+    async getDb(): Promise<DrizzleDb> {
         // 如果正在初始化，等待完成
         if (this.initPromise) {
             await this.initPromise;
@@ -82,65 +80,35 @@ class DatabaseManager {
             await this.init();
         }
 
-        if (!this.kyselyDb) {
+        if (!this.drizzleDb) {
             throw new Error('Database initialization failed');
         }
 
-        return this.kyselyDb;
+        return this.drizzleDb;
     }
 
     /**
-     * 获取 Kysely 数据库实例（同步版本，仅用于已确保初始化的场景）
-     * @returns Kysely 实例
-     * @throws 如果数据库未初始化
-     * @deprecated 推荐使用异步的 getKysely() 方法
+     * 执行原始 SQL 查询，返回对象数组
+     *
+     * 适用场景：
+     * - 复杂的多表 JOIN 查询
+     * - 带子查询的复杂 SQL
+     * - Drizzle ORM 难以表达的查询
+     *
+     * 注意：绕过 Drizzle 的类型安全，需自行确保类型正确
      */
-    getKyselySync(): Kysely<DatabaseSchema> {
-        if (!this.kyselyDb) {
-            throw new Error('Database not initialized. Call init() first or use getKysely().');
+    async rawQuery<T>(sql: string, params: SqlValue[] = []): Promise<T[]> {
+        await this.ensureInitialized();
+        return this.tauriDb!.select<T>(sql, params) as Promise<T[]>;
+    }
+
+    private async ensureInitialized(): Promise<void> {
+        if (this.initPromise) {
+            await this.initPromise;
         }
-        return this.kyselyDb;
-    }
-
-    /**
-     * 获取原始 Tauri 数据库实例（用于迁移等特殊场景）
-     * @returns Tauri Database 实例
-     * @throws 如果数据库未初始化
-     */
-    getTauriDb(): Database {
-        if (!this.tauriDb) {
-            throw new Error('Database not initialized. Call init() first.');
+        if (!this.initialized) {
+            await this.init();
         }
-        return this.tauriDb;
-    }
-
-    /**
-     * 检查数据库是否已初始化
-     */
-    isInitialized(): boolean {
-        return this.initialized;
-    }
-
-    /**
-     * 关闭数据库连接
-     */
-    async close(): Promise<void> {
-        if (this.kyselyDb) {
-            await this.kyselyDb.destroy();
-            this.kyselyDb = null;
-        }
-        if (this.tauriDb) {
-            await this.tauriDb.close();
-            this.tauriDb = null;
-        }
-        this.initialized = false;
-    }
-
-    /**
-     * 获取数据库路径
-     */
-    getPath(): string {
-        return this.dbPath;
     }
 }
 
@@ -148,4 +116,5 @@ class DatabaseManager {
 export const db = new DatabaseManager();
 
 // 导出类型
-export type { DatabaseOptions, Database as DatabaseSchema } from './schema';
+export type { DrizzleDb } from './driver';
+export type { DatabaseOptions } from './schema';

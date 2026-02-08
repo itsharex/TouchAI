@@ -1,7 +1,8 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
 import type { QueryResult } from '@tauri-apps/plugin-sql';
-import type { Generated, Insertable, Selectable, Updateable } from 'kysely';
+import { sql } from 'drizzle-orm';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // ==================== Tauri 相关类型 ====================
 
@@ -28,58 +29,10 @@ export interface DatabaseOptions {
 export interface TauriDatabase {
     execute(sql: string, bindValues?: SqlValue[]): Promise<QueryResult>;
     select<T = unknown>(sql: string, bindValues?: SqlValue[]): Promise<T[]>;
-    close(): Promise<void>;
+    close(): Promise<boolean>;
 }
 
-// ==================== 迁移相关类型 ====================
-
-/**
- * 迁移接口
- */
-export interface Migration {
-    version: number;
-    name: string;
-    up: (db: TauriDatabase) => Promise<void>;
-    down?: (db: TauriDatabase) => Promise<void>;
-}
-
-/**
- * 迁移记录
- */
-export interface MigrationRecord {
-    id: number;
-    version: number;
-    name: string;
-    applied_at: string;
-    created_at: string;
-    updated_at: string;
-}
-
-// ==================== 表结构定义 ====================
-
-/**
- * 会话表
- */
-export interface SessionsTable {
-    id: Generated<number>;
-    session_id: string;
-    title: string;
-    model: string;
-    created_at: Generated<string>;
-    updated_at: Generated<string>;
-}
-
-/**
- * 消息表
- */
-export interface MessagesTable {
-    id: Generated<number>;
-    session_id: number;
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    created_at: Generated<string>;
-    updated_at: Generated<string>;
-}
+// ==================== 表定义（Drizzle） ====================
 
 /**
  * 设置键枚举
@@ -91,127 +44,186 @@ export enum SettingKey {
 }
 
 /**
+ * 会话表
+ */
+export const sessions = sqliteTable('sessions', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    session_id: text('session_id').notNull().unique(),
+    title: text('title').notNull(),
+    model: text('model').notNull(),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
+
+/**
+ * 消息表
+ */
+export const messages = sqliteTable('messages', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    session_id: integer('session_id')
+        .notNull()
+        .references(() => sessions.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: ['user', 'assistant', 'system'] }).notNull(),
+    content: text('content').notNull(),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
+
+/**
  * 设置表
  */
-export interface SettingsTable {
-    id: Generated<number>;
-    key: string;
-    value: string | null;
-    description: string | null;
-    created_at: Generated<string>;
-    updated_at: Generated<string>;
-}
+export const settings = sqliteTable('settings', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    key: text('key').notNull().unique(),
+    value: text('value'),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
 
 /**
  * AI 服务商表
  */
-export interface ProvidersTable {
-    id: Generated<number>;
-    name: string;
-    type: 'openai' | 'anthropic';
-    api_endpoint: string;
-    api_key: string | null;
-    logo: string;
-    enabled: number;
-    is_builtin: number;
-    created_at: Generated<string>;
-    updated_at: Generated<string>;
-}
+export const providers = sqliteTable('providers', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    type: text('type', { enum: ['openai', 'anthropic'] }).notNull(),
+    api_endpoint: text('api_endpoint').notNull(),
+    api_key: text('api_key'),
+    logo: text('logo').notNull(),
+    enabled: integer('enabled').notNull().default(1),
+    is_builtin: integer('is_builtin').notNull().default(0),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
 
 /**
  * AI 模型表
  */
-export interface ModelsTable {
-    id: Generated<number>;
-    provider_id: number;
-    name: string;
-    model_id: string;
-    is_default: number;
-    last_used_at: string | null;
-    created_at: Generated<string>;
-    updated_at: Generated<string>;
-}
+export const models = sqliteTable('models', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    provider_id: integer('provider_id')
+        .notNull()
+        .references(() => providers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    model_id: text('model_id').notNull(),
+    is_default: integer('is_default').notNull().default(0),
+    last_used_at: text('last_used_at'),
+    // 元数据字段（直接存储，不再 JOIN llm_metadata）
+    attachment: integer('attachment').notNull().default(0),
+    modalities: text('modalities'), // JSON string: {input: [], output: []}
+    open_weights: integer('open_weights').notNull().default(0),
+    reasoning: integer('reasoning').notNull().default(0),
+    release_date: text('release_date'),
+    temperature: integer('temperature').notNull().default(1),
+    tool_call: integer('tool_call').notNull().default(0),
+    knowledge: text('knowledge'),
+    context_limit: integer('context_limit'),
+    output_limit: integer('output_limit'),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
 
 /**
  * AI 请求表
  */
-export interface AiRequestsTable {
-    id: Generated<number>;
-    session_id: number | null;
-    model_id: number;
-    prompt: string;
-    response: string | null;
-    status: 'pending' | 'streaming' | 'completed' | 'failed' | 'cancelled';
-    error_message: string | null;
-    tokens_used: number | null;
-    duration_ms: number | null;
-    created_at: Generated<string>;
-    updated_at: Generated<string>;
-}
+export const aiRequests = sqliteTable('ai_requests', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    session_id: integer('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+    model_id: integer('model_id')
+        .notNull()
+        .references(() => models.id, { onDelete: 'cascade' }),
+    prompt: text('prompt').notNull(),
+    response: text('response'),
+    status: text('status', {
+        enum: ['pending', 'streaming', 'completed', 'failed', 'cancelled'],
+    })
+        .notNull()
+        .default('pending'),
+    error_message: text('error_message'),
+    tokens_used: integer('tokens_used'),
+    duration_ms: integer('duration_ms'),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
 
 /**
  * LLM 元数据表
  */
-export interface LlmMetadataTable {
-    id: Generated<number>;
-    model_id: string;
-    name: string;
-    attachment: number;
-    modalities: string; // JSON string
-    open_weights: number;
-    reasoning: number;
-    release_date: string | null;
-    temperature: number;
-    tool_call: number;
-    knowledge: string | null; // JSON string
-    limit: string | null; // JSON string
-    created_at: Generated<string>;
-    updated_at: Generated<string>;
-}
-
-/**
- * 数据库 Schema（Kysely）
- */
-export interface Database {
-    sessions: SessionsTable;
-    messages: MessagesTable;
-    settings: SettingsTable;
-    providers: ProvidersTable;
-    models: ModelsTable;
-    ai_requests: AiRequestsTable;
-    llm_metadata: LlmMetadataTable;
-}
+export const llmMetadata = sqliteTable('llm_metadata', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    model_id: text('model_id').notNull().unique(),
+    name: text('name').notNull(),
+    attachment: integer('attachment').notNull().default(0),
+    modalities: text('modalities').notNull(), // JSON string
+    open_weights: integer('open_weights').notNull().default(0),
+    reasoning: integer('reasoning').notNull().default(0),
+    release_date: text('release_date'),
+    temperature: integer('temperature').notNull().default(1),
+    tool_call: integer('tool_call').notNull().default(0),
+    knowledge: text('knowledge'), // JSON string
+    limit: text('limit'), // JSON string
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
 
 // ==================== 类型别名 ====================
 
-export type Session = Selectable<SessionsTable>;
-export type NewSession = Insertable<SessionsTable>;
-export type SessionUpdate = Updateable<SessionsTable>;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
+export type SessionUpdate = Partial<NewSession>;
 
-export type Message = Selectable<MessagesTable>;
-export type NewMessage = Insertable<MessagesTable>;
-export type MessageUpdate = Updateable<MessagesTable>;
+export type Message = typeof messages.$inferSelect;
+export type NewMessage = typeof messages.$inferInsert;
+export type MessageUpdate = Partial<NewMessage>;
 
-export type Setting = Selectable<SettingsTable>;
-export type NewSetting = Insertable<SettingsTable>;
-export type SettingUpdate = Updateable<SettingsTable>;
+export type Setting = typeof settings.$inferSelect;
+export type NewSetting = typeof settings.$inferInsert;
+export type SettingUpdate = Partial<NewSetting>;
 
-export type Provider = Selectable<ProvidersTable>;
-export type NewProvider = Insertable<ProvidersTable>;
-export type ProviderUpdate = Updateable<ProvidersTable>;
+export type Provider = typeof providers.$inferSelect;
+export type NewProvider = typeof providers.$inferInsert;
+export type ProviderUpdate = Partial<NewProvider>;
 
-export type Model = Selectable<ModelsTable>;
-export type NewModel = Insertable<ModelsTable>;
-export type ModelUpdate = Updateable<ModelsTable>;
+export type Model = typeof models.$inferSelect;
+export type NewModel = typeof models.$inferInsert;
+export type ModelUpdate = Partial<NewModel>;
 
-export type AiRequest = Selectable<AiRequestsTable>;
-export type NewAiRequest = Insertable<AiRequestsTable>;
-export type AiRequestUpdate = Updateable<AiRequestsTable>;
+export type AiRequest = typeof aiRequests.$inferSelect;
+export type NewAiRequest = typeof aiRequests.$inferInsert;
+export type AiRequestUpdate = Partial<NewAiRequest>;
 
-export type LlmMetadata = Selectable<LlmMetadataTable>;
-export type NewLlmMetadata = Insertable<LlmMetadataTable>;
-export type LlmMetadataUpdate = Updateable<LlmMetadataTable>;
+export type LlmMetadata = typeof llmMetadata.$inferSelect;
+export type NewLlmMetadata = typeof llmMetadata.$inferInsert;
+export type LlmMetadataUpdate = Partial<NewLlmMetadata>;
 
-export type MessageRole = MessagesTable['role'];
-export type ProviderType = ProvidersTable['type'];
-export type RequestStatus = AiRequestsTable['status'];
+export type MessageRole = Message['role'];
+export type ProviderType = Provider['type'];
+export type RequestStatus = AiRequest['status'];

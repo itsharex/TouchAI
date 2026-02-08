@@ -1,30 +1,22 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
-import { UpdateResult } from 'kysely';
+import { eq, inArray } from 'drizzle-orm';
 
 import { db } from '../index';
 import type { NewSetting, Setting, SettingUpdate } from '../schema';
-import { SettingKey } from '../schema';
+import { SettingKey, settings } from '../schema';
 
 /**
  * 根据 ID 查找设置
  */
 export const findSettingById = async (id: number) =>
-    (await db.getKysely())
-        .selectFrom('settings')
-        .selectAll()
-        .where('id', '=', id)
-        .executeTakeFirst();
+    (await db.getDb()).select().from(settings).where(eq(settings.id, id)).get();
 
 /**
  * 根据 key 查找设置
  */
 export const findSettingByKey = async (key: string | SettingKey) =>
-    (await db.getKysely())
-        .selectFrom('settings')
-        .selectAll()
-        .where('key', '=', key)
-        .executeTakeFirst();
+    (await db.getDb()).select().from(settings).where(eq(settings.key, key)).get();
 
 /**
  * 获取设置值
@@ -38,21 +30,20 @@ export const getSettingValue = async (key: string | SettingKey): Promise<string 
  * 查找所有设置
  */
 export const findAllSettings = async () =>
-    (await db.getKysely()).selectFrom('settings').selectAll().orderBy('key', 'asc').execute();
+    (await db.getDb()).select().from(settings).orderBy(settings.key).all();
 
 /**
  * 创建设置
  */
 export const createSetting = async (data: NewSetting): Promise<Setting> => {
-    await (await db.getKysely()).insertInto('settings').values(data).execute();
+    const drizzle = await db.getDb();
+    await drizzle.insert(settings).values(data).run();
 
-    // 获取最后插入的记录
-    const lastInsert = await (await db.getKysely())
-        .selectFrom('settings')
-        .selectAll()
-        .orderBy('id', 'desc')
-        .limit(1)
-        .executeTakeFirst();
+    const lastInsert = await drizzle
+        .select()
+        .from(settings)
+        .where(eq(settings.key, data.key))
+        .get();
 
     if (!lastInsert) {
         throw new Error('Failed to create setting');
@@ -63,18 +54,8 @@ export const createSetting = async (data: NewSetting): Promise<Setting> => {
 /**
  * 更新设置
  */
-export const updateSetting = async (id: number, data: SettingUpdate): Promise<UpdateResult> => {
-    const result = await (await db.getKysely())
-        .updateTable('settings')
-        .set(data)
-        .where('id', '=', id)
-        .executeTakeFirst();
-
-    if (!result || result.numUpdatedRows === 0n) {
-        throw new Error(`Setting with id ${id} not found`);
-    }
-
-    return result;
+export const updateSetting = async (id: number, data: SettingUpdate): Promise<void> => {
+    await (await db.getDb()).update(settings).set(data).where(eq(settings.id, id)).run();
 };
 
 /**
@@ -83,35 +64,21 @@ export const updateSetting = async (id: number, data: SettingUpdate): Promise<Up
 export const updateSettingValue = async (
     key: string | SettingKey,
     value: string
-): Promise<UpdateResult> => {
-    const result = await (await db.getKysely())
-        .updateTable('settings')
-        .set({ value })
-        .where('key', '=', key)
-        .executeTakeFirst();
-
-    if (!result || result.numUpdatedRows === 0n) {
-        throw new Error(`Setting with key ${key} not found`);
-    }
-
-    return result;
+): Promise<void> => {
+    await (await db.getDb()).update(settings).set({ value }).where(eq(settings.key, key)).run();
 };
 
 /**
  * 设置值（不存在则创建）
  */
-export const setSetting = async (
-    key: string | SettingKey,
-    value: string,
-    description?: string
-): Promise<Setting> => {
+export const setSetting = async (key: string | SettingKey, value: string): Promise<Setting> => {
     const existing = await findSettingByKey(key);
 
     if (existing) {
         await updateSettingValue(key, value);
-        return findSettingByKey(key) as Promise<Setting>;
+        return (await findSettingByKey(key)) as Setting;
     } else {
-        return createSetting({ key, value, description: description || null });
+        return createSetting({ key, value });
     }
 };
 
@@ -119,24 +86,16 @@ export const setSetting = async (
  * 删除设置
  */
 export const deleteSetting = async (id: number): Promise<boolean> => {
-    const result = await (await db.getKysely())
-        .deleteFrom('settings')
-        .where('id', '=', id)
-        .executeTakeFirst();
-
-    return Number(result.numDeletedRows) > 0;
+    await (await db.getDb()).delete(settings).where(eq(settings.id, id)).run();
+    return true;
 };
 
 /**
  * 根据 key 删除设置
  */
 export const deleteSettingByKey = async (key: string | SettingKey): Promise<boolean> => {
-    const result = await (await db.getKysely())
-        .deleteFrom('settings')
-        .where('key', '=', key)
-        .executeTakeFirst();
-
-    return Number(result.numDeletedRows) > 0;
+    await (await db.getDb()).delete(settings).where(eq(settings.key, key)).run();
+    return true;
 };
 
 /**
@@ -145,13 +104,13 @@ export const deleteSettingByKey = async (key: string | SettingKey): Promise<bool
 export const getSettings = async (
     keys: (string | SettingKey)[]
 ): Promise<Record<string, string | null>> => {
-    const settings = await (await db.getKysely())
-        .selectFrom('settings')
-        .select(['key', 'value'])
-        .where('key', 'in', keys)
-        .execute();
+    const result = await (await db.getDb())
+        .select({ key: settings.key, value: settings.value })
+        .from(settings)
+        .where(inArray(settings.key, keys))
+        .all();
 
-    return Object.fromEntries(settings.map((s) => [s.key, s.value]));
+    return Object.fromEntries(result.map((s) => [s.key, s.value]));
 };
 
 /**
@@ -167,11 +126,11 @@ export const setSettings = async (values: Record<string, string>): Promise<void>
  * 检查 key 是否存在
  */
 export const settingKeyExists = async (key: string | SettingKey): Promise<boolean> => {
-    const result = await (await db.getKysely())
-        .selectFrom('settings')
-        .select('id')
-        .where('key', '=', key)
-        .executeTakeFirst();
+    const result = await (await db.getDb())
+        .select({ id: settings.id })
+        .from(settings)
+        .where(eq(settings.key, key))
+        .get();
 
     return result !== undefined;
 };

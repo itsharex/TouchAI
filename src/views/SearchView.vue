@@ -366,7 +366,7 @@
             const shortcut = storedShortcut || DEFAULT_GLOBAL_SHORTCUT;
 
             if (!storedShortcut) {
-                await setSetting('global_shortcut', DEFAULT_GLOBAL_SHORTCUT, '全局快捷键');
+                await setSetting('global_shortcut', DEFAULT_GLOBAL_SHORTCUT);
             }
 
             await invoke('register_global_shortcut', { shortcut });

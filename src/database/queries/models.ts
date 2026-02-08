@@ -1,76 +1,70 @@
 // Copyright (c) 2025. 千诚. Licensed under GPL v3
 
-import { sql, UpdateResult } from 'kysely';
+import { and, count, desc, eq, sql } from 'drizzle-orm';
 
 import { db } from '../index';
 import type { Model, ModelUpdate, NewModel } from '../schema';
+import { models, providers } from '../schema';
 
 /**
  * 根据 ID 查找模型
  */
 export const findModelById = async (id: number) =>
-    (await db.getKysely()).selectFrom('models').selectAll().where('id', '=', id).executeTakeFirst();
+    (await db.getDb()).select().from(models).where(eq(models.id, id)).get();
 
 /**
  * 查找全局默认模型
  */
 export const findDefaultModel = async () =>
-    (await db.getKysely())
-        .selectFrom('models')
-        .selectAll()
-        .where('is_default', '=', 1)
-        .executeTakeFirst();
+    (await db.getDb()).select().from(models).where(eq(models.is_default, 1)).get();
 
 /**
  * 查找默认模型且服务商已启用（包含服务商信息和元数据）
  */
-export const findDefaultModelWithProvider = async () =>
-    sql`
-        SELECT
-            models.*,
-            providers.name AS provider_name,
-            providers.type AS provider_type,
-            providers.api_endpoint,
-            providers.api_key,
-            providers.enabled AS provider_enabled,
-            providers.logo AS provider_logo,
-            llm_metadata.attachment AS metadata_attachment,
-            llm_metadata.modalities AS metadata_modalities,
-            llm_metadata.open_weights AS metadata_open_weights,
-            llm_metadata.reasoning AS metadata_reasoning,
-            llm_metadata.release_date AS metadata_release_date,
-            llm_metadata.temperature AS metadata_temperature,
-            llm_metadata.tool_call AS metadata_tool_call,
-            llm_metadata.knowledge AS metadata_knowledge,
-            llm_metadata."limit" AS metadata_limit
-        FROM models
-        INNER JOIN providers ON providers.id = models.provider_id
-        LEFT JOIN llm_metadata
-            ON llm_metadata.id = (
-                SELECT m2.id
-                FROM llm_metadata AS m2
-                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
-                ORDER BY
-                    (
-                        COALESCE(m2.attachment, 0)
-                        + COALESCE(m2.open_weights, 0)
-                        + COALESCE(m2.reasoning, 0)
-                        + COALESCE(m2.temperature, 0)
-                        + COALESCE(m2.tool_call, 0)
-                        + CASE
-                            WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1
-                            ELSE 0
-                        END
-                    ) DESC,
-                    length(m2.model_id) DESC
-                LIMIT 1
-            )
-        WHERE models.is_default = 1 AND providers.enabled = 1
-        ORDER BY models.id ASC
-        LIMIT 1
-    `
-        .execute(await db.getKysely())
-        .then((result) => result.rows[0] ?? null);
+export const findDefaultModelWithProvider =
+    async (): Promise<ModelWithProviderAndMetadata | null> => {
+        const result = await (
+            await db.getDb()
+        )
+            .select({
+                id: models.id,
+                created_at: models.created_at,
+                updated_at: models.updated_at,
+                provider_id: models.provider_id,
+                model_id: models.model_id,
+                name: models.name,
+                is_default: models.is_default,
+                last_used_at: models.last_used_at,
+                attachment: models.attachment,
+                modalities: models.modalities,
+                open_weights: models.open_weights,
+                reasoning: models.reasoning,
+                release_date: models.release_date,
+                temperature: models.temperature,
+                tool_call: models.tool_call,
+                knowledge: models.knowledge,
+                context_limit: models.context_limit,
+                output_limit: models.output_limit,
+                provider_name: sql<string>`${providers.name}`.as('provider_name'),
+                provider_type: sql<string>`${providers.type}`.as('provider_type'),
+                api_endpoint: sql<string>`${providers.api_endpoint}`.as('api_endpoint'),
+                api_key: sql<string | null>`${providers.api_key}`.as('api_key'),
+                provider_enabled: sql<number>`${providers.enabled}`.as('provider_enabled'),
+                provider_logo: sql<string>`${providers.logo}`.as('provider_logo'),
+            })
+            .from(models)
+            .innerJoin(providers, eq(providers.id, models.provider_id))
+            .where(and(eq(models.is_default, 1), eq(providers.enabled, 1)))
+            .orderBy(models.id)
+            .limit(1)
+            .get();
+
+        // Drizzle sqlite-proxy 在无结果时返回所有字段为 undefined 的对象，需要检查 id
+        if (!result || result.id === undefined) {
+            return null;
+        }
+        return result;
+    };
 
 export interface ModelWithProviderAndMetadata {
     id: number;
@@ -81,110 +75,84 @@ export interface ModelWithProviderAndMetadata {
     name: string;
     is_default: number;
     last_used_at: string | null;
+    attachment: number;
+    modalities: string | null;
+    open_weights: number;
+    reasoning: number;
+    release_date: string | null;
+    temperature: number;
+    tool_call: number;
+    knowledge: string | null;
+    context_limit: number | null;
+    output_limit: number | null;
     provider_name: string;
     provider_type: string;
     api_endpoint: string;
     api_key: string | null;
     provider_enabled: number;
     provider_logo: string;
-    metadata_attachment: number | null;
-    metadata_modalities: string | null;
-    metadata_open_weights: number | null;
-    metadata_reasoning: number | null;
-    metadata_release_date: string | null;
-    metadata_temperature: number | null;
-    metadata_tool_call: number | null;
-    metadata_knowledge: string | null;
-    metadata_limit: string | null;
 }
 
 /**
- * 查找模型并关联服务商信息和元数据（JOIN 查询）
- * 使用 LIKE 匹配，忽略大小写，允许部分匹配
- * 例如：models.model_id = "gpt-4-turbo" 可以匹配 llm_metadata.model_id = "gpt-4"
- * 如果匹配到多个metadata记录，只取第一个（按model_id长度降序，优先匹配更具体的）
+ * 查找模型并关联服务商信息（直接从 models 表读取元数据）
  */
 export const findModelsWithProvider = async (
     providerId?: number
 ): Promise<ModelWithProviderAndMetadata[]> => {
-    const whereClause =
-        providerId !== undefined ? sql`WHERE models.provider_id = ${providerId}` : sql``;
+    const drizzle = await db.getDb();
+    const query = drizzle
+        .select({
+            id: models.id,
+            created_at: models.created_at,
+            updated_at: models.updated_at,
+            provider_id: models.provider_id,
+            model_id: models.model_id,
+            name: models.name,
+            is_default: models.is_default,
+            last_used_at: models.last_used_at,
+            attachment: models.attachment,
+            modalities: models.modalities,
+            open_weights: models.open_weights,
+            reasoning: models.reasoning,
+            release_date: models.release_date,
+            temperature: models.temperature,
+            tool_call: models.tool_call,
+            knowledge: models.knowledge,
+            context_limit: models.context_limit,
+            output_limit: models.output_limit,
+            provider_name: sql<string>`${providers.name}`.as('provider_name'),
+            provider_type: sql<string>`${providers.type}`.as('provider_type'),
+            api_endpoint: sql<string>`${providers.api_endpoint}`.as('api_endpoint'),
+            api_key: sql<string | null>`${providers.api_key}`.as('api_key'),
+            provider_enabled: sql<number>`${providers.enabled}`.as('provider_enabled'),
+            provider_logo: sql<string>`${providers.logo}`.as('provider_logo'),
+        })
+        .from(models)
+        .innerJoin(providers, eq(providers.id, models.provider_id));
 
-    const query = sql<ModelWithProviderAndMetadata>`
-        SELECT
-            models.*,
-            providers.name AS provider_name,
-            providers.type AS provider_type,
-            providers.api_endpoint,
-            providers.api_key,
-            providers.enabled AS provider_enabled,
-            providers.logo AS provider_logo,
-            llm_metadata.attachment AS metadata_attachment,
-            llm_metadata.modalities AS metadata_modalities,
-            llm_metadata.open_weights AS metadata_open_weights,
-            llm_metadata.reasoning AS metadata_reasoning,
-            llm_metadata.release_date AS metadata_release_date,
-            llm_metadata.temperature AS metadata_temperature,
-            llm_metadata.tool_call AS metadata_tool_call,
-            llm_metadata.knowledge AS metadata_knowledge,
-            llm_metadata."limit" AS metadata_limit
-        FROM models
-        INNER JOIN providers ON providers.id = models.provider_id
-        LEFT JOIN llm_metadata
-            ON llm_metadata.id = (
-                SELECT m2.id
-                FROM llm_metadata AS m2
-                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
-                ORDER BY
-                    (
-                        COALESCE(m2.attachment, 0)
-                        + COALESCE(m2.open_weights, 0)
-                        + COALESCE(m2.reasoning, 0)
-                        + COALESCE(m2.temperature, 0)
-                        + COALESCE(m2.tool_call, 0)
-                        + CASE
-                            WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1
-                            ELSE 0
-                        END
-                    ) DESC,
-                    length(m2.model_id) DESC
-                LIMIT 1
-            )
-        ${whereClause}
-        ORDER BY models.is_default DESC, models.id ASC
-    `;
+    if (providerId !== undefined) {
+        return query
+            .where(eq(models.provider_id, providerId))
+            .orderBy(desc(models.is_default), models.id)
+            .all();
+    }
 
-    return query
-        .execute(await db.getKysely())
-        .then((result) => result.rows as ModelWithProviderAndMetadata[]);
+    return query.orderBy(desc(models.is_default), models.id).all();
 };
 
 /**
  * 创建模型
  */
 export const createModel = async (data: NewModel): Promise<Model> => {
-    const result = await (await db.getKysely())
-        .insertInto('models')
-        .values(data)
-        .returningAll()
-        .executeTakeFirst();
+    const drizzle = await db.getDb();
+    await drizzle.insert(models).values(data).run();
 
-    if (!result) {
-        // 如果 returning 不工作，尝试获取最后插入的记录
-        const lastInsert = await (await db.getKysely())
-            .selectFrom('models')
-            .selectAll()
-            .orderBy('id', 'desc')
-            .limit(1)
-            .executeTakeFirst();
+    const lastInsert = await drizzle.select().from(models).orderBy(desc(models.id)).limit(1).get();
 
-        if (!lastInsert) {
-            throw new Error('Failed to create model');
-        }
-        return lastInsert;
+    if (!lastInsert) {
+        throw new Error('Failed to create model');
     }
-
-    return result;
+    return lastInsert;
 };
 
 /**
@@ -192,26 +160,14 @@ export const createModel = async (data: NewModel): Promise<Model> => {
  */
 export const createModels = async (data: NewModel[]): Promise<void> => {
     if (data.length === 0) return;
-
-    await (await db.getKysely()).insertInto('models').values(data).execute();
-
-    return;
+    await (await db.getDb()).insert(models).values(data).run();
 };
 
 /**
  * 更新模型
  */
-export const updateModel = async (id: number, data: ModelUpdate): Promise<UpdateResult> => {
-    const result = await (await db.getKysely())
-        .updateTable('models')
-        .set(data)
-        .where('id', '=', id)
-        .executeTakeFirst();
-
-    if (!result || result.numUpdatedRows === 0n) {
-        throw new Error(`Model with id ${id} not found`);
-    }
-    return result;
+export const updateModel = async (id: number, data: ModelUpdate): Promise<void> => {
+    await (await db.getDb()).update(models).set(data).where(eq(models.id, id)).run();
 };
 
 /**
@@ -226,13 +182,19 @@ export const updateModelLastUsed = async (id: number) =>
  * 验证：模型所属的服务商必须已启用
  */
 export const setDefaultModel = async (modelId: number): Promise<void> => {
+    const drizzle = await db.getDb();
+
     // 检查模型是否存在以及服务商是否启用
-    const modelWithProvider = await (await db.getKysely())
-        .selectFrom('models')
-        .innerJoin('providers', 'providers.id', 'models.provider_id')
-        .select(['models.id', 'providers.enabled', 'providers.name as provider_name'])
-        .where('models.id', '=', modelId)
-        .executeTakeFirst();
+    const modelWithProvider = await drizzle
+        .select({
+            id: models.id,
+            enabled: providers.enabled,
+            provider_name: providers.name,
+        })
+        .from(models)
+        .innerJoin(providers, eq(providers.id, models.provider_id))
+        .where(eq(models.id, modelId))
+        .get();
 
     if (!modelWithProvider) {
         throw new Error('模型不存在');
@@ -242,25 +204,24 @@ export const setDefaultModel = async (modelId: number): Promise<void> => {
         throw new Error(`无法设置默认模型：服务商 "${modelWithProvider.provider_name}" 未启用`);
     }
 
-    await (await db.getKysely()).transaction().execute(async (trx) => {
-        // 取消所有默认设置
-        await trx.updateTable('models').set({ is_default: 0 }).execute();
+    // 取消当前默认模型（只更新 is_default=1 的记录）
+    await drizzle.update(models).set({ is_default: 0 }).where(eq(models.is_default, 1)).run();
 
-        // 设置新的默认模型
-        await trx.updateTable('models').set({ is_default: 1 }).where('id', '=', modelId).execute();
-    });
+    // 设置新的默认模型
+    await drizzle.update(models).set({ is_default: 1 }).where(eq(models.id, modelId)).run();
 };
 
 /**
  * 检查服务商是否有默认模型
  */
 export const providerHasDefaultModel = async (providerId: number): Promise<boolean> => {
-    const model = await (await db.getKysely())
-        .selectFrom('models')
-        .select('id')
-        .where('provider_id', '=', providerId)
-        .where('is_default', '=', 1)
-        .executeTakeFirst();
+    const model = await (
+        await db.getDb()
+    )
+        .select({ id: models.id })
+        .from(models)
+        .where(and(eq(models.provider_id, providerId), eq(models.is_default, 1)))
+        .get();
 
     return !!model;
 };
@@ -269,62 +230,219 @@ export const providerHasDefaultModel = async (providerId: number): Promise<boole
  * 删除模型
  */
 export const deleteModel = async (id: number): Promise<boolean> => {
-    const result = await (await db.getKysely())
-        .deleteFrom('models')
-        .where('id', '=', id)
-        .executeTakeFirst();
-    return Number(result.numDeletedRows) > 0;
+    await (await db.getDb()).delete(models).where(eq(models.id, id)).run();
+    return true;
 };
 
 /**
  * 统计模型数量
  */
 export const countModels = async (): Promise<number> => {
-    const result = await (
-        await db.getKysely()
-    )
-        .selectFrom('models')
-        .select((eb) => eb.fn.countAll().as('count'))
-        .executeTakeFirst();
-    return Number(result?.count || 0);
+    const result = await (await db.getDb()).select({ count: count() }).from(models).get();
+    return result?.count || 0;
 };
 
 /**
  * 根据 model_id 查找模型（包含服务商信息）
  */
 export const findModelByModelId = async (modelId: string) =>
-    (await db.getKysely())
-        .selectFrom('models')
-        .innerJoin('providers', 'providers.id', 'models.provider_id')
-        .selectAll('models')
-        .select([
-            'providers.name as provider_name',
-            'providers.type as provider_type',
-            'providers.api_endpoint',
-            'providers.api_key',
-            'providers.enabled as provider_enabled',
-            'providers.logo as provider_logo',
-        ])
-        .where('models.model_id', '=', modelId)
-        .executeTakeFirst();
+    (await db.getDb())
+        .select({
+            id: models.id,
+            provider_id: models.provider_id,
+            name: models.name,
+            model_id: models.model_id,
+            is_default: models.is_default,
+            last_used_at: models.last_used_at,
+            created_at: models.created_at,
+            updated_at: models.updated_at,
+            attachment: models.attachment,
+            modalities: models.modalities,
+            open_weights: models.open_weights,
+            reasoning: models.reasoning,
+            release_date: models.release_date,
+            temperature: models.temperature,
+            tool_call: models.tool_call,
+            knowledge: models.knowledge,
+            context_limit: models.context_limit,
+            output_limit: models.output_limit,
+            provider_name: sql<string>`${providers.name}`.as('provider_name'),
+            provider_type: sql<string>`${providers.type}`.as('provider_type'),
+            api_endpoint: sql<string>`${providers.api_endpoint}`.as('api_endpoint'),
+            api_key: sql<string | null>`${providers.api_key}`.as('api_key'),
+            provider_enabled: sql<number>`${providers.enabled}`.as('provider_enabled'),
+            provider_logo: sql<string>`${providers.logo}`.as('provider_logo'),
+        })
+        .from(models)
+        .innerJoin(providers, eq(providers.id, models.provider_id))
+        .where(eq(models.model_id, modelId))
+        .get();
 
 /**
  * 根据 provider_id 和 model_id 查找模型（包含服务商信息）
  * 用于精确定位特定提供商的特定模型
  */
 export const findModelByProviderAndModelId = async (providerId: number, modelId: string) =>
-    (await db.getKysely())
-        .selectFrom('models')
-        .innerJoin('providers', 'providers.id', 'models.provider_id')
-        .selectAll('models')
-        .select([
-            'providers.name as provider_name',
-            'providers.type as provider_type',
-            'providers.api_endpoint',
-            'providers.api_key',
-            'providers.enabled as provider_enabled',
-            'providers.logo as provider_logo',
-        ])
-        .where('models.provider_id', '=', providerId)
-        .where('models.model_id', '=', modelId)
-        .executeTakeFirst();
+    (await db.getDb())
+        .select({
+            id: models.id,
+            provider_id: models.provider_id,
+            name: models.name,
+            model_id: models.model_id,
+            is_default: models.is_default,
+            last_used_at: models.last_used_at,
+            created_at: models.created_at,
+            updated_at: models.updated_at,
+            attachment: models.attachment,
+            modalities: models.modalities,
+            open_weights: models.open_weights,
+            reasoning: models.reasoning,
+            release_date: models.release_date,
+            temperature: models.temperature,
+            tool_call: models.tool_call,
+            knowledge: models.knowledge,
+            context_limit: models.context_limit,
+            output_limit: models.output_limit,
+            provider_name: sql<string>`${providers.name}`.as('provider_name'),
+            provider_type: sql<string>`${providers.type}`.as('provider_type'),
+            api_endpoint: sql<string>`${providers.api_endpoint}`.as('api_endpoint'),
+            api_key: sql<string | null>`${providers.api_key}`.as('api_key'),
+            provider_enabled: sql<number>`${providers.enabled}`.as('provider_enabled'),
+            provider_logo: sql<string>`${providers.logo}`.as('provider_logo'),
+        })
+        .from(models)
+        .innerJoin(providers, eq(providers.id, models.provider_id))
+        .where(and(eq(models.provider_id, providerId), eq(models.model_id, modelId)))
+        .get();
+
+/**
+ * 批量同步所有模型的元数据
+ * 从 llm_metadata 表匹配并更新到 models 表
+ */
+export const syncAllModelsMetadata = async (): Promise<number> => {
+    // 使用单条 SQL 批量更新所有 models 的元数据
+    // 匹配逻辑：llm_metadata.model_id 包含 models.model_id（模糊匹配）
+    // 优先选择能力字段最多的记录
+    const sql = `
+        UPDATE models
+        SET
+            attachment = COALESCE((
+                SELECT m2.attachment
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), attachment),
+            modalities = COALESCE((
+                SELECT m2.modalities
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), modalities),
+            open_weights = COALESCE((
+                SELECT m2.open_weights
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), open_weights),
+            reasoning = COALESCE((
+                SELECT m2.reasoning
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), reasoning),
+            release_date = COALESCE((
+                SELECT m2.release_date
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), release_date),
+            temperature = COALESCE((
+                SELECT m2.temperature
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), temperature),
+            tool_call = COALESCE((
+                SELECT m2.tool_call
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), tool_call),
+            knowledge = COALESCE((
+                SELECT m2.knowledge
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), knowledge),
+            context_limit = COALESCE((
+                SELECT json_extract(m2."limit", '$.context')
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), context_limit),
+            output_limit = COALESCE((
+                SELECT json_extract(m2."limit", '$.output')
+                FROM llm_metadata AS m2
+                WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+                ORDER BY
+                    (m2.attachment + m2.open_weights + m2.reasoning + m2.temperature + m2.tool_call +
+                        CASE WHEN m2.modalities IS NOT NULL AND m2.modalities <> '' THEN 1 ELSE 0 END
+                    ) DESC,
+                    length(m2.model_id) DESC
+                LIMIT 1
+            ), output_limit),
+            updated_at = datetime('now')
+        WHERE EXISTS (
+            SELECT 1 FROM llm_metadata AS m2
+            WHERE lower(m2.model_id) LIKE '%' || lower(models.model_id) || '%'
+        )
+    `;
+
+    const result = await db.rawQuery<{ changes: number }>(`${sql}; SELECT changes() as changes;`);
+    return result[0]?.changes ?? 0;
+};
