@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
     import ConfirmDialog from '@components/common/ConfirmDialog.vue';
     import SvgIcon from '@components/common/SvgIcon.vue';
     import {
@@ -9,7 +9,7 @@
         deleteAllMessages,
         deleteAllSessions,
     } from '@database/queries';
-    import { updateModelMetadata } from '@utils/modelMetadata';
+    import { updateModelMetadata } from '@services/AiService/metadatas';
     import { onMounted, ref } from 'vue';
 
     interface DataStats {

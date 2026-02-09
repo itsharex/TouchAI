@@ -1,15 +1,17 @@
-<!-- Copyright (c) 2025. 千诚. Licensed under GPL v3 -->
+﻿<!--
+  - Copyright (c) 2025-2026. Qian Cheng. Licensed under GPL v3
+  -->
 
 <script setup lang="ts">
     import SvgIcon from '@components/common/SvgIcon.vue';
-    import AddProviderDialog from '@components/settings/AddProviderDialog.vue';
-    import BadgedLogo from '@components/settings/BadgedLogo.vue';
-    import EditProviderDialog from '@components/settings/EditProviderDialog.vue';
-    import ModelList from '@components/settings/ModelList.vue';
-    import ProviderConfig from '@components/settings/ProviderConfig.vue';
-    import ProviderContextMenu from '@components/settings/ProviderContextMenu.vue';
-    import ProviderList from '@components/settings/ProviderList.vue';
-    import { useAlert } from '@composables/useAlert';
+    import AddProviderDialog from '@components/settings/ai-services/AddProviderDialog.vue';
+    import BadgedLogo from '@components/settings/ai-services/BadgedLogo.vue';
+    import EditProviderDialog from '@components/settings/ai-services/EditProviderDialog.vue';
+    import ModelList from '@components/settings/ai-services/ModelList.vue';
+    import ProviderConfig from '@components/settings/ai-services/ProviderConfig.vue';
+    import ProviderContextMenu from '@components/settings/ai-services/ProviderContextMenu.vue';
+    import ProviderList from '@components/settings/ai-services/ProviderList.vue';
+    import { useAlert } from '@composables/useAlert.ts';
     import {
         createModel,
         createModels,
@@ -25,11 +27,11 @@
         updateModel,
         updateProvider,
     } from '@database/queries';
-    import { isLlmMetadataEmpty } from '@database/queries/llmMetadata';
-    import type { ModelWithProviderAndMetadata } from '@database/queries/models';
-    import type { Model, NewModel, NewProvider, Provider } from '@database/schema';
-    import { aiService } from '@services/ai/manager';
-    import { updateModelMetadata } from '@utils/modelMetadata';
+    import { isLlmMetadataEmpty } from '@database/queries/llmMetadata.ts';
+    import type { ModelWithProviderAndMetadata } from '@database/queries/models.ts';
+    import type { Model, NewModel, NewProvider, Provider } from '@database/schema.ts';
+    import { aiService } from '@services/AiService/manager.ts';
+    import { updateModelMetadata } from '@services/AiService/metadatas';
     import { computed, onMounted, ref } from 'vue';
 
     const alert = useAlert();

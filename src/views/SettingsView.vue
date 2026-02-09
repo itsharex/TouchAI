@@ -3,15 +3,16 @@
 <script setup lang="ts">
     import ConfirmDialog from '@components/common/ConfirmDialog.vue';
     import TitleBar from '@components/common/TitleBar.vue';
-    import AboutView from '@components/settings/AboutView.vue';
-    import AiServicesView from '@components/settings/AiServicesView.vue';
-    import DataManagement from '@components/settings/DataManagement.vue';
-    import GeneralSettings from '@components/settings/GeneralSettings.vue';
     import NavigationSidebar, {
         type NavigationSection,
     } from '@components/settings/NavigationSidebar.vue';
     import { useConfirm } from '@composables/useConfirm';
     import { ref } from 'vue';
+
+    import AboutView from '@/views/settings/AboutView.vue';
+    import AiServicesView from '@/views/settings/AiServicesView.vue';
+    import DataManagementView from '@/views/settings/DataManagementView.vue';
+    import GeneralView from '@/views/settings/GeneralView.vue';
 
     const { confirmState, handleConfirm, handleCancel } = useConfirm();
 
@@ -34,7 +35,7 @@
                     v-if="activeSection === 'general'"
                     class="custom-scrollbar h-full overflow-y-auto"
                 >
-                    <GeneralSettings />
+                    <GeneralView />
                 </div>
 
                 <AiServicesView v-if="activeSection === 'ai-services'" />
@@ -43,7 +44,7 @@
                     v-if="activeSection === 'data-management'"
                     class="custom-scrollbar h-full overflow-y-auto"
                 >
-                    <DataManagement />
+                    <DataManagementView />
                 </div>
 
                 <div

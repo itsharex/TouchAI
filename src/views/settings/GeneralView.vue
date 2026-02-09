@@ -266,7 +266,6 @@
 </script>
 
 <template>
-    <!-- Alert Message Component -->
     <AlertMessage ref="alertMessage" />
 
     <div class="p-6">
