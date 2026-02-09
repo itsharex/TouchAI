@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   - Copyright (c) 2026. Qian Cheng. Licensed under GPL v3
   -->
 
@@ -63,17 +63,17 @@
 
 <script setup lang="ts">
     // Copyright (c) 2025. 千诚. Licensed under GPL v3.
-    import logoWord from '@assets/logo_word.svg';
+    import logoWord from '@assets/logo-word.svg';
     import ModelLogo from '@components/common/ModelLogo.vue';
     import SvgIcon from '@components/common/SvgIcon.vue';
     import AttachmentList from '@components/search/AttachmentList.vue';
     import { findModelsWithProvider } from '@database/queries';
     import type { ModelWithProviderAndMetadata } from '@database/queries/models';
-    import { aiService } from '@services/ai/manager';
-    import { popupManager } from '@services/popup';
+    import type { Index } from '@services/AiService/attachments';
+    import { aiService } from '@services/AiService/manager';
+    import { popupManager } from '@services/PopupService';
     import { getCurrentWindow } from '@tauri-apps/api/window';
     import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
-    import type { Attachment } from '@utils/attachment.ts';
     import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
     interface ModelCapabilities {
@@ -83,7 +83,7 @@
 
     interface Props {
         disabled?: boolean;
-        attachments?: Attachment[];
+        attachments?: Index[];
     }
 
     const { disabled = false, attachments = [] } = defineProps<Props>();
@@ -374,7 +374,7 @@
         emit('removeAttachment', id);
     }
 
-    async function previewAttachment(attachment: Attachment) {
+    async function previewAttachment(attachment: Index) {
         if (attachment.type === 'image') {
             await openPath(attachment.path);
         } else {
