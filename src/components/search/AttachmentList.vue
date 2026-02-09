@@ -55,15 +55,6 @@
         return getAttachmentSupportMessage(attachment) || attachment.name;
     }
 
-    function getAttachmentClass(attachment: Index) {
-        return [
-            'bg-background-primary group relative flex flex-shrink-0 items-center gap-1.5 rounded border border-gray-200 px-2 py-1 transition-colors',
-            isAttachmentSupported(attachment)
-                ? 'cursor-pointer hover:border-gray-300'
-                : 'cursor-not-allowed opacity-50 grayscale',
-        ];
-    }
-
     async function toggleOverflowPopup() {
         if (!overflowButtonRef.value) return;
 
@@ -77,40 +68,39 @@
         }
     }
 
+    async function syncOverflowPopup() {
+        if (!isOverflowOpen.value) return;
+
+        if (!hasOverflow.value || props.attachments.length <= props.maxVisible) {
+            await popupManager.hide();
+            isOverflowOpen.value = false;
+            emit('focusSearchBar');
+            return;
+        }
+
+        await popupManager.updateData({
+            attachments: overflowAttachments.value,
+        });
+    }
+
     function handleAttachmentAction(action: 'remove' | 'preview', attachmentId: string) {
         const attachment = props.attachments.find((a) => a.id === attachmentId);
         if (!attachment) return;
 
         if (action === 'remove') {
             handleRemove(attachmentId);
-
-            if (props.attachments.length === 0 && isOverflowOpen.value) {
-                // 附件列表为空，关闭弹窗并聚焦搜索框
-                popupManager.hide();
-                isOverflowOpen.value = false;
-                emit('focusSearchBar');
-            } else if (isOverflowOpen.value) {
-                // 还有附件，更新弹窗数据
-                popupManager.updateData({
-                    attachments: overflowAttachments.value,
-                });
-            }
         } else {
             handlePreview(attachment);
         }
     }
 
-    // 监听附件列表变化
+    // 监听附件列表变化并同步已打开的溢出弹窗
     watch(
-        () => props.attachments.length,
-        (newLength, oldLength) => {
-            // 如果附件从有变为无，且弹窗打开，关闭弹窗
-            if (oldLength > 0 && newLength === 0 && isOverflowOpen.value) {
-                popupManager.hide();
-                isOverflowOpen.value = false;
-                emit('focusSearchBar');
-            }
-        }
+        () => props.attachments,
+        () => {
+            void syncOverflowPopup();
+        },
+        { deep: true }
     );
 
     // 清理函数引用
@@ -136,23 +126,31 @@
 </script>
 
 <template>
-    <div v-if="attachments.length > 0" class="flex max-w-[30%] items-center gap-2">
+    <div
+        v-if="attachments.length > 0"
+        class="box-border flex h-full max-w-[30%] items-center gap-1"
+    >
         <div
             v-for="attachment in visibleAttachments"
             :key="attachment.id"
+            class="bg-background-primary group relative flex flex-shrink-0 items-center gap-1.5 rounded border border-gray-200 px-1 py-1 transition-colors"
             :title="getAttachmentTitle(attachment)"
-            :class="getAttachmentClass(attachment)"
+            :class="[
+                isAttachmentSupported(attachment)
+                    ? 'cursor-pointer hover:border-gray-300'
+                    : 'cursor-not-allowed opacity-50 grayscale',
+            ]"
             @click="handlePreview(attachment)"
         >
             <img
                 v-if="attachment.preview"
                 :src="attachment.preview"
                 :alt="attachment.name"
-                class="h-6 w-6 rounded object-cover"
+                class="h-5 w-5 rounded object-cover"
             />
 
             <button
-                class="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-gray-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-gray-500"
+                class="absolute -top-1 -right-1 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full bg-gray-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-gray-500"
                 @click.stop="handleRemove(attachment.id)"
             >
                 <SvgIcon name="x" class="h-2 w-2 text-white" />

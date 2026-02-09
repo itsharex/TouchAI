@@ -215,7 +215,7 @@
     <div
         ref="dropdownRef"
         :class="[
-            'custom-scrollbar-thin h-full w-80 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg select-none',
+            'custom-scrollbar-thin max-h-96 w-80 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg select-none',
             isInPopup ? '' : 'absolute top-full left-0 z-[9999] mt-2',
         ]"
     >
@@ -269,7 +269,7 @@
         </div>
         <div
             v-if="filteredModels.length === 0"
-            class="flex h-full flex-col items-center justify-center px-4"
+            class="flex min-h-[120px] flex-col items-center justify-center px-4"
         >
             <SvgIcon
                 :name="searchQuery ? 'search' : 'database'"
