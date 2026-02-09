@@ -2,8 +2,8 @@
 
 import { createAiRequest, updateAiRequest } from '@database/queries';
 import type { AiRequest } from '@database/schema';
+import { aiService } from '@services/AiService';
 import type { Index } from '@services/AiService/attachments';
-import { aiService } from '@services/AiService/manager';
 import { sendNotification } from '@tauri-apps/plugin-notification';
 import { computed, ref } from 'vue';
 

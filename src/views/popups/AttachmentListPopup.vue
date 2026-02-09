@@ -7,12 +7,12 @@
         getAttachmentSupportMessage,
         isAttachmentSupported,
     } from '@services/AiService/attachments';
-    import type { AttachmentOverflowData } from '@services/PopupService';
+    import type { AttachmentListData } from '@services/PopupService';
     import { emit as tauriEmit } from '@tauri-apps/api/event';
     import { computed, ref } from 'vue';
 
     interface Props {
-        data: AttachmentOverflowData | null;
+        data: AttachmentListData | null;
         isInPopup?: boolean;
     }
 

@@ -30,7 +30,7 @@
     import { isLlmMetadataEmpty } from '@database/queries/llmMetadata.ts';
     import type { ModelWithProviderAndMetadata } from '@database/queries/models.ts';
     import type { Model, NewModel, NewProvider, Provider } from '@database/schema.ts';
-    import { aiService } from '@services/AiService/manager.ts';
+    import { aiService } from '@services/AiService';
     import { updateModelMetadata } from '@services/AiService/metadatas';
     import { computed, onMounted, ref } from 'vue';
 

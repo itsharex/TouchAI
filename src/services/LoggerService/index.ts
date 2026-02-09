@@ -222,7 +222,7 @@ export const initializeLogger = (): void => {
  * 类型化的 logger 接口（可替代直接使用 console.*）
  * 提供与打补丁的 console 方法相同的功能
  */
-export const logger = {
+export const index = {
     trace: (...args: unknown[]) => console.trace(...args),
     debug: (...args: unknown[]) => console.debug(...args),
     info: (...args: unknown[]) => console.info(...args),

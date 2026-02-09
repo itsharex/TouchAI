@@ -36,6 +36,8 @@ export interface PopupConfig<TData = unknown> {
     width: number;
     /** 窗口高度（逻辑像素） */
     height: number;
+    /** 窗口最小高度（逻辑像素），用于内容不足时保持最低高度 */
+    minHeight?: number;
     /** Vue 组件 */
     component: Component;
     /** 位置计算函数 */
@@ -77,7 +79,7 @@ export interface ModelDropdownData {
 /**
  * 附件溢出弹窗数据
  */
-export interface AttachmentOverflowData {
+export interface AttachmentListData {
     attachments: Array<{
         id: string;
         name: string;
@@ -93,7 +95,7 @@ export interface AttachmentOverflowData {
 /**
  * 弹窗数据联合类型
  */
-export type PopupData = ModelDropdownData | AttachmentOverflowData;
+export type PopupData = ModelDropdownData | AttachmentListData;
 
 /**
  * 根据 PopupType 获取对应的数据类型
@@ -101,7 +103,7 @@ export type PopupData = ModelDropdownData | AttachmentOverflowData;
 export type PopupDataFor<T extends PopupType> = T extends 'model-dropdown-popup'
     ? ModelDropdownData
     : T extends 'attachment-overflow-popup'
-      ? AttachmentOverflowData
+      ? AttachmentListData
       : never;
 
 /**

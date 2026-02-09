@@ -3,7 +3,7 @@
 export { popupManager } from './manager';
 export { initializeBuiltInPopups, popupRegistry } from './registry';
 export type {
-    AttachmentOverflowData,
+    AttachmentListData,
     ModelDropdownData,
     PopupConfig,
     PopupData,

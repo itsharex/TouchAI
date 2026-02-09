@@ -62,15 +62,14 @@
 </template>
 
 <script setup lang="ts">
-    // Copyright (c) 2025. 千诚. Licensed under GPL v3.
     import logoWord from '@assets/logo-word.svg';
     import ModelLogo from '@components/common/ModelLogo.vue';
     import SvgIcon from '@components/common/SvgIcon.vue';
     import AttachmentList from '@components/search/AttachmentList.vue';
     import { findModelsWithProvider } from '@database/queries';
     import type { ModelWithProviderAndMetadata } from '@database/queries/models';
+    import { aiService } from '@services/AiService';
     import type { Index } from '@services/AiService/attachments';
-    import { aiService } from '@services/AiService/manager';
     import { popupManager } from '@services/PopupService';
     import { getCurrentWindow } from '@tauri-apps/api/window';
     import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -108,7 +107,7 @@
         return isSearchingModel.value ? '请输入模型名称或ID' : placeholder;
     });
 
-    // Model selection state
+    // 模型选择状态
     const selectedModelId = ref<string | null>(null);
     const selectedModelName = ref<string | null>(null);
     const selectedProviderId = ref<number | null>(null); // 添加 provider_id

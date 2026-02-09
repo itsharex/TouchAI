@@ -1,6 +1,6 @@
 // Copyright (c) 2026. Qian Cheng. Licensed under GPL v3
 
-import AttachmentOverflowPopup from '@/views/popups/AttachmentOverflowPopup.vue';
+import AttachmentListPopup from '@/views/popups/AttachmentListPopup.vue';
 import ModelDropdownPopup from '@/views/popups/ModelDropdownPopup.vue';
 
 import type { PopupConfig, PopupType, SerializablePopupConfig } from './types';
@@ -88,7 +88,7 @@ export function initializeBuiltInPopups(): void {
         id: 'attachment-overflow-popup',
         width: 256,
         height: 320,
-        component: AttachmentOverflowPopup,
+        component: AttachmentListPopup,
         calculatePosition: (triggerElement, mainWindow, dimensions) => {
             const searchBarContainer = triggerElement.closest('.search-bar-container');
             const searchBarHeight = searchBarContainer?.getBoundingClientRect().height || 60;

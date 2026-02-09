@@ -5,7 +5,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import PopupView from '@/views/PopupView.vue';
 import SearchView from '@/views/SearchView.vue';
 import SettingsView from '@/views/SettingsView.vue';
-import TrayMenuView from '@/views/TrayMenuView.vue';
+import TrayView from '@/views/TrayView.vue';
 
 const routes = [
     {
@@ -21,7 +21,7 @@ const routes = [
     {
         path: '/tray-menu',
         name: 'TrayMenu',
-        component: TrayMenuView,
+        component: TrayView,
     },
     {
         path: '/popup',

@@ -2,7 +2,7 @@
 
 import '@styles/tailwind.css';
 
-import { initializeLogger } from '@services/LoggerService/logger.ts';
+import { initializeLogger } from '@services/LoggerService';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { createApp } from 'vue';
 
