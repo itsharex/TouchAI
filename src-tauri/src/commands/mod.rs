@@ -1,7 +1,8 @@
-// Copyright (c) 2025. 千诚. Licensed under GPL v3.
+// Copyright (c) 2026. 千诚. Licensed under GPL v3.
 
 //! 命令入口模块。
 pub mod autostart;
+pub mod database;
 pub mod shortcut;
 pub mod window;
 
@@ -21,5 +22,6 @@ pub fn invoke_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Sen
         autostart::disable_autostart,
         autostart::is_autostart_enabled,
         window::close_tray_menu,
+        database::get_database_path,
     ]
 }

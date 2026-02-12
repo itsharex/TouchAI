@@ -1,4 +1,4 @@
-// Copyright (c) 2025. Qian Cheng. Licensed under GPL v3
+// Copyright (c) 2026. Qian Cheng. Licensed under GPL v3
 
 mod commands;
 mod core;
@@ -10,7 +10,7 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app_result = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(core::system::logging::build_plugin())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
@@ -18,18 +18,25 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .plugin(tauri_plugin_sql::Builder::new().build())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_x::init())
         .plugin(tauri_plugin_fs_pro::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(core::system::shortcut::create_shortcut_handler())
                 .build(),
         )
         .manage(PopupRegistry::new())
-        .invoke_handler(commands::invoke_handler())
+        .invoke_handler(commands::invoke_handler());
+
+    #[cfg(all(feature = "mcp-bridge", debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_mcp_bridge::init());
+
+    let app_result = builder
         .setup(|app| {
             match ensure_data_directory() {
                 Ok(data_dir) => {
