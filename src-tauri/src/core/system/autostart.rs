@@ -1,4 +1,4 @@
-// Copyright (c) 2025. 千诚. Licensed under GPL v3
+// Copyright (c) 2026. 千诚. Licensed under GPL v3
 
 //! 开机自启动模块
 //!
@@ -16,9 +16,18 @@ pub fn enable_autostart(app: AppHandle) -> Result<(), String> {
 
 pub fn disable_autostart(app: AppHandle) -> Result<(), String> {
     let autostart_manager = app.autolaunch();
-    autostart_manager
-        .disable()
-        .map_err(|e| format!("Failed to disable autostart: {}", e))
+    match autostart_manager.disable() {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            let err_text = err.to_string();
+            if err_text.contains("os error 2") || err_text.contains("系统找不到指定的文件")
+            {
+                return Ok(());
+            }
+
+            Err(format!("Failed to disable autostart: {}", err))
+        }
+    }
 }
 
 pub fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
