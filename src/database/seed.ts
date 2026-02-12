@@ -1,4 +1,4 @@
-// Copyright (c) 2025. 千诚. Licensed under GPL v3
+// Copyright (c) 2026. 千诚. Licensed under GPL v3
 
 import type { TauriDatabase } from './schema';
 import { SettingKey } from './schema';
@@ -112,6 +112,10 @@ const BUILTIN_PROVIDERS = [
  * 后续新增内置数据只需追加到常量数组即可
  */
 export async function seed(tauriDb: TauriDatabase): Promise<void> {
+    await tauriDb.execute(
+        `INSERT OR IGNORE INTO touchai_meta (key, value) VALUES ('app_id', 'touchai')`
+    );
+
     // 插入默认设置（按 key 去重）
     const existingSettings = await tauriDb.select<{ key: string }>('SELECT key FROM settings');
     const existingKeys = new Set(existingSettings.map((s) => s.key));

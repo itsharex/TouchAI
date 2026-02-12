@@ -1,4 +1,4 @@
-// Copyright (c) 2025. 千诚. Licensed under GPL v3
+// Copyright (c) 2026. 千诚. Licensed under GPL v3
 
 import type { QueryResult } from '@tauri-apps/plugin-sql';
 import { sql } from 'drizzle-orm';
@@ -44,6 +44,21 @@ export enum SettingKey {
 }
 
 /**
+ * 统计键枚举
+ */
+export enum StatisticKey {
+    MODEL_METADATA_LAST_UPDATED_AT = 'model_metadata_last_updated_at',
+}
+
+/**
+ * 元数据键枚举
+ */
+export enum MetaKey {
+    APP_ID = 'app_id',
+    IMPORT_SUCCESS = 'import_success',
+}
+
+/**
  * 会话表
  */
 export const sessions = sqliteTable('sessions', {
@@ -81,6 +96,37 @@ export const messages = sqliteTable('messages', {
  * 设置表
  */
 export const settings = sqliteTable('settings', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    key: text('key').notNull().unique(),
+    value: text('value'),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
+
+/**
+ * 统计表
+ */
+export const statistics = sqliteTable('statistics', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    key: text('key').notNull().unique(),
+    value: text('value'),
+    created_at: text('created_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+    updated_at: text('updated_at')
+        .notNull()
+        .default(sql`(datetime('now'))`),
+});
+
+/**
+ * 应用元数据表
+ * 用于存储应用级别的状态信息，如数据库标识、更新状态等
+ */
+export const touchaiMeta = sqliteTable('touchai_meta', {
     id: integer('id').primaryKey({ autoIncrement: true }),
     key: text('key').notNull().unique(),
     value: text('value'),
@@ -135,6 +181,7 @@ export const models = sqliteTable('models', {
     knowledge: text('knowledge'),
     context_limit: integer('context_limit'),
     output_limit: integer('output_limit'),
+    is_custom_metadata: integer('is_custom_metadata').notNull().default(0), // 用户是否自定义了元数据
     created_at: text('created_at')
         .notNull()
         .default(sql`(datetime('now'))`),
@@ -152,8 +199,12 @@ export const aiRequests = sqliteTable('ai_requests', {
     model_id: integer('model_id')
         .notNull()
         .references(() => models.id, { onDelete: 'cascade' }),
-    prompt: text('prompt').notNull(),
-    response: text('response'),
+    prompt_message_id: integer('prompt_message_id').references(() => messages.id, {
+        onDelete: 'set null',
+    }),
+    response_message_id: integer('response_message_id').references(() => messages.id, {
+        onDelete: 'set null',
+    }),
     status: text('status', {
         enum: ['pending', 'streaming', 'completed', 'failed', 'cancelled'],
     })
@@ -207,6 +258,14 @@ export type MessageUpdate = Partial<NewMessage>;
 export type Setting = typeof settings.$inferSelect;
 export type NewSetting = typeof settings.$inferInsert;
 export type SettingUpdate = Partial<NewSetting>;
+
+export type Statistic = typeof statistics.$inferSelect;
+export type NewStatistic = typeof statistics.$inferInsert;
+export type StatisticUpdate = Partial<NewStatistic>;
+
+export type TouchAiMeta = typeof touchaiMeta.$inferSelect;
+export type NewTouchAiMeta = typeof touchaiMeta.$inferInsert;
+export type TouchAiMetaUpdate = Partial<NewTouchAiMeta>;
 
 export type Provider = typeof providers.$inferSelect;
 export type NewProvider = typeof providers.$inferInsert;
