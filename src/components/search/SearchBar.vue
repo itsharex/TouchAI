@@ -421,27 +421,31 @@
         }
     }
 
+    // 拖动检测相关状态
+    let mouseDownPos: { x: number; y: number } | null = null;
+    let mouseDownTime = 0;
+    let isDraggingDetected = false;
+    const DRAG_THRESHOLD = 5; // 移动超过 5px 判定为拖动
+    const DRAG_TIME_THRESHOLD = 150; // 按下超过 150ms 判定为可能拖动
+
     // 处理 input 的 mousedown 事件
-    async function handleInputMouseDown(event: MouseEvent) {
+    function handleInputMouseDown(event: MouseEvent) {
         const input = searchInput.value;
         if (!input) return;
 
-        // 如果 input 为空（显示 placeholder），整个区域都支持拖动
+        // 记录鼠标按下的位置和时间
+        mouseDownPos = { x: event.clientX, y: event.clientY };
+        mouseDownTime = Date.now();
+        isDraggingDetected = false;
+
+        // 如果输入框为空（显示 placeholder），整个区域都支持拖动
         if (!input.value) {
             event.preventDefault();
-            emit('dragStart');
-            try {
-                await getCurrentWindow().startDragging();
-            } finally {
-                // 延迟清除拖动状态，避免拖动结束时立即触发失焦隐藏
-                setTimeout(() => {
-                    emit('dragEnd');
-                }, 100);
-            }
+            startDragging();
             return;
         }
 
-        // 获取点击位置相对于 input 的 x 坐标
+        // 获取点击位置相对于输入框的 x 坐标
         const rect = input.getBoundingClientRect();
         const clickX = event.clientX - rect.left;
 
@@ -450,25 +454,73 @@
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // 获取 input 的计算样式
+        // 获取输入框的计算样式
         const style = window.getComputedStyle(input);
         ctx.font = `${style.fontSize} ${style.fontFamily}`;
         const textWidth = ctx.measureText(input.value).width;
 
-        // 如果点击位置在文本之后（空白区域），启动拖动
-        // 添加一些 padding 容差
+        // 如果点击位置在文本之后（空白区域）
         const padding = 10;
         if (clickX > textWidth + padding) {
+            // 区分点击和拖动
+            const handleMouseMove = (e: MouseEvent) => {
+                if (!mouseDownPos) return;
+
+                const deltaX = Math.abs(e.clientX - mouseDownPos.x);
+                const deltaY = Math.abs(e.clientY - mouseDownPos.y);
+                const timeDelta = Date.now() - mouseDownTime;
+
+                // 如果移动距离超过阈值，或者按下时间超过阈值且有移动，判定为拖动
+                if (
+                    deltaX > DRAG_THRESHOLD ||
+                    deltaY > DRAG_THRESHOLD ||
+                    (timeDelta > DRAG_TIME_THRESHOLD && (deltaX > 2 || deltaY > 2))
+                ) {
+                    isDraggingDetected = true;
+                    // 移除监听器
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                    // 开始拖动
+                    event.preventDefault();
+                    startDragging();
+                }
+            };
+
+            const handleMouseUp = () => {
+                // 移除监听器
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+
+                // 如果没有检测到拖动，执行点击操作（将光标移到末尾）
+                if (!isDraggingDetected && input) {
+                    input.setSelectionRange(input.value.length, input.value.length);
+                    input.focus();
+                }
+
+                // 重置状态
+                mouseDownPos = null;
+                isDraggingDetected = false;
+            };
+
+            // 添加监听器
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+
+            // 阻止默认行为，避免文本选择
             event.preventDefault();
-            emit('dragStart');
-            try {
-                await getCurrentWindow().startDragging();
-            } finally {
-                // 延迟清除拖动状态，避免拖动结束时立即触发失焦隐藏
-                setTimeout(() => {
-                    emit('dragEnd');
-                }, 100);
-            }
+        }
+    }
+
+    // 开始拖动窗口
+    async function startDragging() {
+        emit('dragStart');
+        try {
+            await getCurrentWindow().startDragging();
+        } finally {
+            // 延迟清除拖动状态，避免拖动结束时立即触发失焦隐藏
+            setTimeout(() => {
+                emit('dragEnd');
+            }, 100);
         }
     }
 
@@ -487,3 +539,16 @@
         isCursorAtStart,
     });
 </script>
+
+<style scoped>
+    @reference "@styles/tailwind.css";
+
+    /* 搜索框文本选择颜色 - 使用主题色系 */
+    input::selection {
+        @apply bg-primary-200 text-primary-700;
+    }
+
+    input::-moz-selection {
+        @apply bg-primary-200 text-primary-700;
+    }
+</style>
