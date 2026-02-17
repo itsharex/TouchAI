@@ -9,9 +9,10 @@
     import EditProviderDialog from '@components/settings/ai-services/EditProviderDialog.vue';
     import ModelList from '@components/settings/ai-services/ModelList.vue';
     import ProviderConfig from '@components/settings/ai-services/ProviderConfig.vue';
-    import ProviderContextMenu from '@components/settings/ai-services/ProviderContextMenu.vue';
     import ProviderList from '@components/settings/ai-services/ProviderList.vue';
     import { useAlert } from '@composables/useAlert.ts';
+    import { useContextMenu } from '@composables/useContextMenu.ts';
+    import { useScrollbarStabilizer } from '@composables/useScrollbarStabilizer';
     import {
         createModel,
         createModels,
@@ -36,6 +37,24 @@
 
     const alert = useAlert();
 
+    const contentScrollRef = ref<HTMLElement | null>(null);
+    useScrollbarStabilizer(contentScrollRef);
+
+    const { open: openProviderMenu } = useContextMenu<number>(
+        [
+            { key: 'edit', label: '编辑', icon: 'edit' },
+            { key: 'delete', label: '删除', icon: 'trash', danger: true },
+        ],
+        (key, providerId) => {
+            if (key === 'edit') {
+                selectedProviderId.value = providerId;
+                showEditDialog.value = true;
+            } else if (key === 'delete') {
+                handleDeleteProvider(providerId);
+            }
+        }
+    );
+
     const providers = ref<Provider[]>([]);
     const modelsCache = ref<Map<number, ModelWithProvider[]>>(new Map()); // 缓存每个服务商的模型
     const selectedProviderId = ref<number | null>(null);
@@ -48,19 +67,6 @@
     const showEditDialog = ref(false);
     const refreshing = ref(false);
     const refreshingProviderId = ref<number | null>(null);
-
-    // 右键菜单状态
-    const contextMenu = ref<{
-        show: boolean;
-        x: number;
-        y: number;
-        providerId: number | null;
-    }>({
-        show: false,
-        x: 0,
-        y: 0,
-        providerId: null,
-    });
 
     // 计算属性
     const selectedProvider = computed(() =>
@@ -169,29 +175,7 @@
     };
 
     const handleProviderContextMenu = (providerId: number, event: MouseEvent) => {
-        contextMenu.value = {
-            show: true,
-            x: event.clientX,
-            y: event.clientY,
-            providerId,
-        };
-    };
-
-    const handleContextMenuEdit = () => {
-        if (contextMenu.value.providerId) {
-            selectedProviderId.value = contextMenu.value.providerId;
-            showEditDialog.value = true;
-        }
-    };
-
-    const handleContextMenuDelete = () => {
-        if (contextMenu.value.providerId) {
-            handleDeleteProvider(contextMenu.value.providerId);
-        }
-    };
-
-    const closeContextMenu = () => {
-        contextMenu.value.show = false;
+        openProviderMenu(event, providerId);
     };
 
     const handleUpdateProvider = async (data: Partial<Provider>) => {
@@ -468,7 +452,7 @@
             @context-menu="handleProviderContextMenu"
         />
 
-        <div class="custom-scrollbar flex-1 overflow-y-auto">
+        <div ref="contentScrollRef" class="custom-scrollbar flex-1 overflow-y-auto">
             <div v-if="loading" class="flex h-full items-center justify-center">
                 <div
                     class="border-primary-100 border-t-primary-500 h-10 w-10 animate-spin rounded-full border-3"
@@ -556,15 +540,6 @@
             :provider="selectedProvider"
             @update="handleUpdateProviderInfo"
             @cancel="showEditDialog = false"
-        />
-
-        <ProviderContextMenu
-            v-if="contextMenu.show"
-            :x="contextMenu.x"
-            :y="contextMenu.y"
-            @edit="handleContextMenuEdit"
-            @delete="handleContextMenuDelete"
-            @close="closeContextMenu"
         />
     </div>
 </template>

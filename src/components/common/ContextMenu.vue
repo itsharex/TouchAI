@@ -4,19 +4,23 @@
     import SvgIcon from '@components/common/SvgIcon.vue';
     import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-    interface Props {
+    export interface ContextMenuItem {
+        key: string;
+        label: string;
+        icon?: string;
+        danger?: boolean;
+    }
+
+    const props = defineProps<{
         x: number;
         y: number;
-    }
+        items: ContextMenuItem[];
+    }>();
 
-    interface Emits {
-        (e: 'edit'): void;
-        (e: 'delete'): void;
+    const emit = defineEmits<{
+        (e: 'select', key: string): void;
         (e: 'close'): void;
-    }
-
-    const props = defineProps<Props>();
-    const emit = defineEmits<Emits>();
+    }>();
 
     const menuRef = ref<HTMLElement | null>(null);
 
@@ -39,13 +43,8 @@
         document.removeEventListener('click', handleClickOutside);
     });
 
-    const handleEdit = () => {
-        emit('edit');
-        emit('close');
-    };
-
-    const handleDelete = () => {
-        emit('delete');
+    const handleSelect = (key: string) => {
+        emit('select', key);
         emit('close');
     };
 </script>
@@ -57,18 +56,16 @@
         :style="menuStyle"
     >
         <button
-            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
-            @click="handleEdit"
+            v-for="item in items"
+            :key="item.key"
+            :class="[
+                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                item.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100',
+            ]"
+            @click="handleSelect(item.key)"
         >
-            <SvgIcon name="edit" class="h-4 w-4" />
-            编辑
-        </button>
-        <button
-            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
-            @click="handleDelete"
-        >
-            <SvgIcon name="trash" class="h-4 w-4" />
-            删除
+            <SvgIcon v-if="item.icon" :name="item.icon" class="h-4 w-4" />
+            {{ item.label }}
         </button>
     </div>
 </template>

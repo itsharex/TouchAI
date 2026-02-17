@@ -1,8 +1,9 @@
 // Copyright (c) 2026. 千诚. Licensed under GPL v3
 
-import { ref } from 'vue';
+import ConfirmDialogVue from '@components/common/ConfirmDialog.vue';
+import { type App, createApp } from 'vue';
 
-interface ConfirmOptions {
+export interface ConfirmOptions {
     title?: string;
     message: string;
     confirmText?: string;
@@ -10,52 +11,46 @@ interface ConfirmOptions {
     type?: 'warning' | 'danger' | 'info';
 }
 
-interface ConfirmState extends ConfirmOptions {
-    show: boolean;
-    resolve: ((value: boolean) => void) | null;
-}
-
-const confirmState = ref<ConfirmState>({
-    show: false,
-    message: '',
-    resolve: null,
-});
-
 export function useConfirm() {
+    let mountedApp: App | null = null;
+    let container: HTMLDivElement | null = null;
+
+    const cleanup = () => {
+        if (mountedApp) {
+            mountedApp.unmount();
+            mountedApp = null;
+        }
+        if (container) {
+            container.remove();
+            container = null;
+        }
+    };
+
     const confirm = (options: ConfirmOptions): Promise<boolean> => {
+        cleanup();
+
         return new Promise((resolve) => {
-            confirmState.value = {
-                show: true,
+            container = document.createElement('div');
+            document.body.appendChild(container);
+
+            mountedApp = createApp(ConfirmDialogVue, {
                 title: options.title,
                 message: options.message,
                 confirmText: options.confirmText,
                 cancelText: options.cancelText,
                 type: options.type,
-                resolve,
-            };
+                onConfirm: () => {
+                    resolve(true);
+                    cleanup();
+                },
+                onCancel: () => {
+                    resolve(false);
+                    cleanup();
+                },
+            });
+            mountedApp.mount(container);
         });
     };
 
-    const handleConfirm = () => {
-        if (confirmState.value.resolve) {
-            confirmState.value.resolve(true);
-        }
-        confirmState.value.show = false;
-        confirmState.value.resolve = null;
-    };
-
-    const handleCancel = () => {
-        if (confirmState.value.resolve) {
-            confirmState.value.resolve(false);
-        }
-        confirmState.value.show = false;
-        confirmState.value.resolve = null;
-    };
-
-    return {
-        confirmState,
-        confirm,
-        handleConfirm,
-        handleCancel,
-    };
+    return { confirm };
 }

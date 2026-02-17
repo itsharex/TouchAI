@@ -1,22 +1,26 @@
 <!-- Copyright (c) 2026. 千诚. Licensed under GPL v3 -->
 
 <script setup lang="ts">
-    import ConfirmDialog from '@components/common/ConfirmDialog.vue';
     import TitleBar from '@components/common/TitleBar.vue';
     import NavigationSidebar, {
         type NavigationSection,
     } from '@components/settings/NavigationSidebar.vue';
-    import { useConfirm } from '@composables/useConfirm';
+    import { useScrollbarStabilizer } from '@composables/useScrollbarStabilizer';
     import { ref } from 'vue';
 
     import AboutView from '@/views/settings/AboutView.vue';
     import AiServicesView from '@/views/settings/AiServicesView.vue';
     import DataManagementView from '@/views/settings/DataManagementView.vue';
     import GeneralView from '@/views/settings/GeneralView.vue';
-
-    const { confirmState, handleConfirm, handleCancel } = useConfirm();
+    import McpToolsView from '@/views/settings/McpToolsView.vue';
 
     const activeSection = ref<NavigationSection>('general');
+    const generalScrollRef = ref<HTMLElement | null>(null);
+    const dataScrollRef = ref<HTMLElement | null>(null);
+    const aboutScrollRef = ref<HTMLElement | null>(null);
+    useScrollbarStabilizer(generalScrollRef);
+    useScrollbarStabilizer(dataScrollRef);
+    useScrollbarStabilizer(aboutScrollRef);
 
     const handleNavigate = (section: NavigationSection) => {
         activeSection.value = section;
@@ -33,6 +37,7 @@
             <div class="flex-1 overflow-hidden">
                 <div
                     v-if="activeSection === 'general'"
+                    ref="generalScrollRef"
                     class="custom-scrollbar h-full overflow-y-auto"
                 >
                     <GeneralView />
@@ -40,8 +45,11 @@
 
                 <AiServicesView v-if="activeSection === 'ai-services'" />
 
+                <McpToolsView v-if="activeSection === 'mcp-tools'" />
+
                 <div
                     v-if="activeSection === 'data-management'"
+                    ref="dataScrollRef"
                     class="custom-scrollbar h-full overflow-y-auto"
                 >
                     <DataManagementView />
@@ -49,22 +57,12 @@
 
                 <div
                     v-if="activeSection === 'about'"
+                    ref="aboutScrollRef"
                     class="custom-scrollbar h-full overflow-y-auto"
                 >
                     <AboutView />
                 </div>
             </div>
         </div>
-
-        <ConfirmDialog
-            v-if="confirmState.show"
-            :title="confirmState.title"
-            :message="confirmState.message"
-            :confirm-text="confirmState.confirmText"
-            :cancel-text="confirmState.cancelText"
-            :type="confirmState.type"
-            @confirm="handleConfirm"
-            @cancel="handleCancel"
-        />
     </div>
 </template>

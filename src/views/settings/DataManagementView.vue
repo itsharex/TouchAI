@@ -1,9 +1,9 @@
 <script setup lang="ts">
-    import ConfirmDialog from '@components/common/ConfirmDialog.vue';
     import SvgIcon from '@components/common/SvgIcon.vue';
     import ImportModeDialog from '@components/settings/data-management/ImportModeDialog.vue';
     import ProgressDialog from '@components/settings/data-management/ProgressDialog.vue';
     import { useAlert } from '@composables/useAlert';
+    import { useConfirm } from '@composables/useConfirm';
     import { db } from '@database';
     import { databaseBackup, type ImportMode } from '@database/backup';
     import {
@@ -34,10 +34,6 @@
     });
 
     // Dialog states
-    const showConfirmDialog = ref(false);
-    const confirmDialogTitle = ref('');
-    const confirmDialogMessage = ref('');
-    const confirmDialogAction = ref<(() => Promise<void>) | null>(null);
     const showImportModeDialog = ref(false);
 
     // Progress Dialog states
@@ -53,6 +49,7 @@
     let countdownTimer: ReturnType<typeof setInterval> | null = null;
 
     const alert = useAlert();
+    const { confirm } = useConfirm();
 
     const modelMetadataUpdatedText = computed(() => {
         if (!modelMetadataLastUpdatedAt.value) {
@@ -106,62 +103,58 @@
         }
     });
 
-    const showConfirm = (title: string, message: string, action: () => Promise<void>) => {
-        confirmDialogTitle.value = title;
-        confirmDialogMessage.value = message;
-        confirmDialogAction.value = action;
-        showConfirmDialog.value = true;
-    };
-
-    const handleConfirm = async () => {
-        if (confirmDialogAction.value) {
-            await confirmDialogAction.value();
-        }
-        showConfirmDialog.value = false;
-    };
-
     const handleClearSessions = async () => {
-        showConfirm(
-            '清除所有对话历史',
-            '此操作将删除所有对话会话及其消息，且无法恢复。确定要继续吗？',
-            async () => {
-                try {
-                    isLoading.value = true;
-                    await deleteAllSessions();
-                    alert.success('已成功删除所有会话');
-                    await loadStats();
-                } catch (error) {
-                    console.error('Failed to clear sessions:', error);
-                    alert.error('清除对话历史失败');
-                } finally {
-                    isLoading.value = false;
-                }
+        const confirmed = await confirm({
+            title: '清除所有对话历史',
+            message: '此操作将删除所有对话会话及其消息，且无法恢复。确定要继续吗？',
+            type: 'danger',
+        });
+
+        if (confirmed) {
+            try {
+                isLoading.value = true;
+                await deleteAllSessions();
+                alert.success('已成功删除所有会话');
+                await loadStats();
+            } catch (error) {
+                console.error('Failed to clear sessions:', error);
+                alert.error('清除对话历史失败');
+            } finally {
+                isLoading.value = false;
             }
-        );
+        }
     };
 
     const handleClearMessages = async () => {
-        showConfirm(
-            '清除所有消息',
-            '此操作将删除所有消息记录，但保留会话。确定要继续吗？',
-            async () => {
-                try {
-                    isLoading.value = true;
-                    await deleteAllMessages();
-                    alert.success('已成功删除所有消息');
-                    await loadStats();
-                } catch (error) {
-                    console.error('Failed to clear messages:', error);
-                    alert.error('清除消息失败');
-                } finally {
-                    isLoading.value = false;
-                }
+        const confirmed = await confirm({
+            title: '清除所有消息',
+            message: '此操作将删除所有消息记录，但保留会话。确定要继续吗？',
+            type: 'danger',
+        });
+
+        if (confirmed) {
+            try {
+                isLoading.value = true;
+                await deleteAllMessages();
+                alert.success('已成功删除所有消息');
+                await loadStats();
+            } catch (error) {
+                console.error('Failed to clear messages:', error);
+                alert.error('清除消息失败');
+            } finally {
+                isLoading.value = false;
             }
-        );
+        }
     };
 
     const handleClearAiRequests = async () => {
-        showConfirm('清除AI请求记录', '此操作将删除所有AI请求记录。确定要继续吗？', async () => {
+        const confirmed = await confirm({
+            title: '清除AI请求记录',
+            message: '此操作将删除所有AI请求记录。确定要继续吗？',
+            type: 'danger',
+        });
+
+        if (confirmed) {
             try {
                 isLoading.value = true;
                 await deleteAllAiRequests();
@@ -173,7 +166,7 @@
             } finally {
                 isLoading.value = false;
             }
-        });
+        }
     };
 
     // 更新进度弹窗
@@ -477,16 +470,6 @@
                 :message="progressMessage"
                 :progress="progressValue"
                 :status="progressStatus"
-            />
-
-            <ConfirmDialog
-                v-if="showConfirmDialog"
-                :title="confirmDialogTitle"
-                :message="confirmDialogMessage"
-                confirm-text="确定"
-                cancel-text="取消"
-                @confirm="handleConfirm"
-                @cancel="showConfirmDialog = false"
             />
         </div>
     </div>

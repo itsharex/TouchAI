@@ -7,8 +7,6 @@
 @import 'katex/dist/katex.min.css';
 @import './markdown.css';
 
-@config '@/../tailwind.config.js';
-
 @font-face {
     font-family: 'Source Han Serif SC';
     src: url('@/assets/fonts/SourceHanSerifSC-VF.woff2') format('woff2-variations');
@@ -21,6 +19,73 @@
     --font-sans:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     --font-serif: 'Source Han Serif SC', 'Noto Serif SC', 'Source Han Serif', serif;
+
+    /* 背景色 */
+    --color-background-primary: rgba(251, 251, 246, 0.98);
+
+    /* 主色调 - 暖棕灰色系 */
+    --color-primary-50: #f7f5f3;
+    --color-primary-100: #ebe7e3;
+    --color-primary-200: #d9d3cc;
+    --color-primary-300: #b8afa5;
+    --color-primary-400: #968b7d;
+    --color-primary-500: #6b5f54;
+    --color-primary-600: #5a4f45;
+    --color-primary-700: #4a4039;
+
+    /* 次要色 - 紫色系 */
+    --color-secondary-50: #faf5ff;
+    --color-secondary-100: #f3e8ff;
+    --color-secondary-500: #a855f7;
+    --color-secondary-600: #9333ea;
+    --color-secondary-700: #7e22ce;
+
+    /* 成功色 - 绿色系 */
+    --color-success-50: #f0fdf4;
+    --color-success-100: #dcfce7;
+    --color-success-500: #22c55e;
+    --color-success-600: #16a34a;
+    --color-success-700: #15803d;
+    --color-success-800: #166534;
+
+    /* 危险色 - 红色系 */
+    --color-danger-50: #fef2f2;
+    --color-danger-600: #dc2626;
+    --color-danger-700: #b91c1c;
+
+    /* 错误色 - 红色系 */
+    --color-error-50: #fef2f2;
+    --color-error-100: #fee2e2;
+    --color-error-500: #ef4444;
+    --color-error-600: #dc2626;
+    --color-error-700: #b91c1c;
+    --color-error-800: #991b1b;
+
+    /* 警告色 - 黄色系 */
+    --color-warning-50: #fffbeb;
+    --color-warning-100: #fef3c7;
+    --color-warning-500: #f59e0b;
+    --color-warning-600: #d97706;
+    --color-warning-700: #b45309;
+    --color-warning-800: #92400e;
+
+    /* 信息色 - 蓝色系 */
+    --color-info-50: #eff6ff;
+    --color-info-100: #dbeafe;
+    --color-info-500: #3b82f6;
+    --color-info-600: #2563eb;
+    --color-info-700: #1d4ed8;
+    --color-info-800: #1e40af;
+
+    /* OpenAI 品牌色 */
+    --color-openai-light: #dcfce7;
+    --color-openai: #16a34a;
+    --color-openai-dark: #166534;
+
+    /* Claude 品牌色 */
+    --color-claude-light: #f3e8ff;
+    --color-claude: #9333ea;
+    --color-claude-dark: #6b21a8;
 
     /* 行内代码配色 */
     --color-code-inline-bg: #f1ece1;
