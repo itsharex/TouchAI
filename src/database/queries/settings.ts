@@ -14,7 +14,7 @@ export const findSettingByKey = async ({
 }: {
     key: SettingIdentifier;
 }): Promise<SettingEntity | undefined> =>
-    (await db.getDb()).select().from(settings).where(eq(settings.key, key)).get();
+    db.getDb().select().from(settings).where(eq(settings.key, key)).get();
 
 /**
  * 获取设置值
@@ -38,7 +38,7 @@ export const updateSettingValue = async ({
     key: SettingIdentifier;
     value: string;
 }): Promise<void> => {
-    const drizzle = await db.getDb();
+    const drizzle = db.getDb();
     await drizzle
         .insert(settings)
         .values({ key, value })

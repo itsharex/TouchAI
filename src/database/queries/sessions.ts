@@ -10,7 +10,7 @@ import type { SessionCreateData, SessionEntity } from '../types';
  * 创建会话
  */
 export const createSession = async (data: SessionCreateData): Promise<SessionEntity> => {
-    const drizzle = await db.getDb();
+    const drizzle = db.getDb();
     await drizzle.insert(sessions).values(data).run();
 
     const lastInsert = await drizzle
@@ -30,7 +30,7 @@ export const createSession = async (data: SessionCreateData): Promise<SessionEnt
  * 统计会话数
  */
 export const countSessions = async (): Promise<number> => {
-    const result = await (await db.getDb()).select({ count: count() }).from(sessions).get();
+    const result = await db.getDb().select({ count: count() }).from(sessions).get();
 
     return result?.count || 0;
 };
@@ -39,5 +39,5 @@ export const countSessions = async (): Promise<number> => {
  * 删除所有会话
  */
 export const deleteAllSessions = async (): Promise<void> => {
-    await (await db.getDb()).delete(sessions).run();
+    await db.getDb().delete(sessions).run();
 };

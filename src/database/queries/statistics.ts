@@ -14,7 +14,8 @@ export const getStatistic = async ({
 }: {
     key: StatisticIdentifier;
 }): Promise<string | null> => {
-    const statistic = await (await db.getDb())
+    const statistic = await db
+        .getDb()
         .select()
         .from(statistics)
         .where(eq(statistics.key, key))
@@ -32,7 +33,7 @@ export const setStatistic = async ({
     key: StatisticIdentifier;
     value: string;
 }): Promise<boolean> => {
-    const drizzle = await db.getDb();
+    const drizzle = db.getDb();
 
     await drizzle
         .insert(statistics)

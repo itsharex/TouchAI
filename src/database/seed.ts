@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = [
     { key: SettingKey.THEME, value: 'light' },
     { key: SettingKey.LANGUAGE, value: 'zh-CN' },
     { key: SettingKey.AUTO_START, value: 'false' },
+    { key: SettingKey.MCP_MAX_ITERATIONS, value: '10' },
 ];
 
 /**

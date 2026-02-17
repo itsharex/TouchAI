@@ -14,7 +14,7 @@ import type { ProviderCreateData, ProviderEntity, ProviderUpdateData } from '../
  * 3. 其他按 ID 排序
  */
 export const findAllProvidersSorted = async (): Promise<ProviderEntity[]> => {
-    const drizzle = await db.getDb();
+    const drizzle = db.getDb();
     const allProviders = await drizzle.select().from(providers).all();
     const allModels = await drizzle.select().from(models).all();
 
@@ -50,7 +50,7 @@ export const findProviderById = async ({
 }: {
     id: number;
 }): Promise<ProviderEntity | undefined> =>
-    (await db.getDb()).select().from(providers).where(eq(providers.id, id)).get();
+    db.getDb().select().from(providers).where(eq(providers.id, id)).get();
 
 /**
  * 创建服务商
@@ -58,7 +58,7 @@ export const findProviderById = async ({
 export const createProvider = async (
     providerDraft: ProviderCreateData
 ): Promise<ProviderEntity> => {
-    const drizzle = await db.getDb();
+    const drizzle = db.getDb();
     await drizzle.insert(providers).values(providerDraft).run();
 
     const lastInsert = await drizzle
@@ -87,9 +87,8 @@ export const updateProvider = async ({
 }): Promise<void> => {
     // 如果尝试禁用服务商，检查是否有默认模型
     if (providerPatch.enabled === 0) {
-        const defaultModel = await (
-            await db.getDb()
-        )
+        const defaultModel = await db
+            .getDb()
             .select()
             .from(models)
             .where(and(eq(models.provider_id, id), eq(models.is_default, 1)))
@@ -100,7 +99,7 @@ export const updateProvider = async ({
         }
     }
 
-    await (await db.getDb()).update(providers).set(providerPatch).where(eq(providers.id, id)).run();
+    await db.getDb().update(providers).set(providerPatch).where(eq(providers.id, id)).run();
 };
 
 /**
@@ -119,9 +118,8 @@ export const deleteProvider = async ({ id }: { id: number }): Promise<boolean> =
     }
 
     // 检查是否有默认模型
-    const defaultModel = await (
-        await db.getDb()
-    )
+    const defaultModel = await db
+        .getDb()
         .select()
         .from(models)
         .where(and(eq(models.provider_id, id), eq(models.is_default, 1)))
@@ -131,6 +129,6 @@ export const deleteProvider = async ({ id }: { id: number }): Promise<boolean> =
         throw new Error('无法删除包含默认模型的服务商，请先设置其他模型为默认');
     }
 
-    await (await db.getDb()).delete(providers).where(eq(providers.id, id)).run();
+    await db.getDb().delete(providers).where(eq(providers.id, id)).run();
     return true;
 };

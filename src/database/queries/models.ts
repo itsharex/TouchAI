@@ -47,15 +47,14 @@ const modelWithProviderSelection = {
  * 查找全局默认模型
  */
 export const findDefaultModel = async (): Promise<ModelEntity | undefined> =>
-    (await db.getDb()).select().from(models).where(eq(models.is_default, 1)).get();
+    db.getDb().select().from(models).where(eq(models.is_default, 1)).get();
 
 /**
  * 查找默认模型且服务商已启用（包含服务商信息）
  */
 export const findDefaultModelWithProvider = async (): Promise<ModelWithProvider | null> => {
-    const result = await (
-        await db.getDb()
-    )
+    const result = await db
+        .getDb()
         .select(modelWithProviderSelection)
         .from(models)
         .innerJoin(providers, eq(providers.id, models.provider_id))
@@ -79,7 +78,7 @@ export const findModelsWithProvider = async (
     payload: FindModelsWithProviderPayload = {}
 ): Promise<ModelWithProvider[]> => {
     const { providerId } = payload;
-    const drizzle = await db.getDb();
+    const drizzle = db.getDb();
     const query = drizzle
         .select(modelWithProviderSelection)
         .from(models)
@@ -115,7 +114,7 @@ export const createModel = async (modelDraft: ModelCreateData): Promise<ModelEnt
  */
 export const createModels = async (modelList: ModelCreateData[]): Promise<void> => {
     if (modelList.length === 0) return;
-    await (await db.getDb()).insert(models).values(modelList).run();
+    await db.getDb().insert(models).values(modelList).run();
 };
 
 /**
@@ -128,7 +127,7 @@ export const updateModel = async ({
     id: number;
     modelPatch: ModelUpdateData;
 }): Promise<void> => {
-    await (await db.getDb()).update(models).set(modelPatch).where(eq(models.id, id)).run();
+    await db.getDb().update(models).set(modelPatch).where(eq(models.id, id)).run();
 };
 
 /**
@@ -174,7 +173,7 @@ export const setDefaultModel = async ({ modelId }: { modelId: number }): Promise
  * 删除模型
  */
 export const deleteModel = async ({ id }: { id: number }): Promise<boolean> => {
-    await (await db.getDb()).delete(models).where(eq(models.id, id)).run();
+    await db.getDb().delete(models).where(eq(models.id, id)).run();
     return true;
 };
 /**

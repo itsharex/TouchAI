@@ -12,7 +12,7 @@ import type { AiRequestCreateData, AiRequestEntity, AiRequestUpdateData } from '
 export const createAiRequest = async (
     requestDraft: AiRequestCreateData
 ): Promise<AiRequestEntity> => {
-    const drizzle = await db.getDb();
+    const drizzle = db.getDb();
     await drizzle.insert(aiRequests).values(requestDraft).run();
 
     const lastInsert = await drizzle
@@ -38,18 +38,14 @@ export const updateAiRequest = async ({
     id: number;
     requestPatch: AiRequestUpdateData;
 }): Promise<void> => {
-    await (await db.getDb())
-        .update(aiRequests)
-        .set(requestPatch)
-        .where(eq(aiRequests.id, id))
-        .run();
+    await db.getDb().update(aiRequests).set(requestPatch).where(eq(aiRequests.id, id)).run();
 };
 
 /**
  * 统计 AI 请求数量
  */
 export const countAiRequests = async (): Promise<number> => {
-    const result = await (await db.getDb()).select({ count: count() }).from(aiRequests).get();
+    const result = await db.getDb().select({ count: count() }).from(aiRequests).get();
     return result?.count || 0;
 };
 
@@ -57,5 +53,5 @@ export const countAiRequests = async (): Promise<number> => {
  * 删除所有 AI 请求
  */
 export const deleteAllAiRequests = async (): Promise<void> => {
-    await (await db.getDb()).delete(aiRequests).run();
+    await db.getDb().delete(aiRequests).run();
 };
