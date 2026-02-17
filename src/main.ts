@@ -106,9 +106,12 @@ async function initializeApp() {
     app.use(router);
     app.mount('#app');
 
-    // 6. 仅主窗口和设置窗口初始化 MCP
-    if (['main', 'settings'].includes(windowLabel)) {
+    // 6. 仅主窗口连接服务器，仅主窗口和设置窗口初始化 MCP
+    if (windowLabel == 'main') {
         await mcpManager.autoConnect();
+    }
+
+    if (['main', 'settings'].includes(windowLabel)) {
         const mcpStore = useMcpStore();
         await mcpStore.initialize();
     }
