@@ -79,6 +79,19 @@
         }
     });
 
+    const transportBadgeText = computed(() => {
+        switch (props.server.transport_type) {
+            case 'stdio':
+                return 'Stdio';
+            case 'sse':
+                return 'SSE';
+            case 'http':
+                return 'HTTP';
+            default:
+                return '未知';
+        }
+    });
+
     const transportBadgeColor = computed(() => {
         switch (props.server.transport_type) {
             case 'stdio':
@@ -121,7 +134,7 @@
                             transportBadgeColor,
                         ]"
                     >
-                        {{ server.transport_type }}
+                        {{ transportBadgeText }}
                     </span>
                     <span
                         v-if="server.version"

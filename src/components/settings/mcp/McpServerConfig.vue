@@ -57,7 +57,11 @@
 
     const transportOptions = [
         { label: 'Stdio', value: 'stdio' as DbTransportType, description: '标准输入输出' },
-        { label: 'SSE', value: 'sse' as DbTransportType, description: 'Server-Sent Events' },
+        {
+            label: 'SSE(Streamable HTTP)',
+            value: 'sse' as DbTransportType,
+            description: '兼容Streamable HTTP与SSE',
+        },
         { label: 'HTTP', value: 'http' as DbTransportType, description: 'HTTP POST' },
     ];
 
