@@ -5,9 +5,18 @@
 <template>
     <div class="relative w-full">
         <div
+            class="toolbar-fade-overlay absolute top-0 right-0 left-0 z-20 flex h-[4.5rem] cursor-grab items-start px-10 pt-3 active:cursor-grabbing"
+            @mousedown="handleToolbarDragMouseDown"
+        >
+            <div class="w-full">
+                <ConversationToolbar :is-pinned="isPinned" @pin-change="togglePinned" />
+            </div>
+        </div>
+
+        <div
             ref="conversationContainer"
             tabindex="0"
-            class="conversation-container custom-scrollbar bg-background-primary w-full overflow-y-auto px-10 py-5"
+            class="conversation-container custom-scrollbar bg-background-primary w-full overflow-y-auto px-10 pt-[4.5rem] pb-5"
             :style="{ maxHeight: `${maxHeight}px` }"
             @scroll="handleScroll"
             @wheel.passive="markUserScrollIntent"
@@ -15,8 +24,6 @@
             @touchstart.passive="markUserScrollIntent"
             @keydown="handleScrollIntentByKeyboard"
         >
-            <ConversationToolbar :is-pinned="isPinned" @pin-change="togglePinned" />
-
             <!-- 消息列表 -->
             <div ref="messageListRef" class="message-list">
                 <MessageItem
@@ -50,6 +57,7 @@
     import MessageItem from '@components/search/MessageItem.vue';
     import type { ConversationMessage } from '@composables/useAgent.ts';
     import { useScrollbarStabilizer } from '@composables/useScrollbarStabilizer';
+    import { getCurrentWindow } from '@tauri-apps/api/window';
     import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
     interface Props {
@@ -68,6 +76,8 @@
     const emit = defineEmits<{
         pinChange: [isPinned: boolean];
         regenerateMessage: [messageId: string];
+        dragStart: [];
+        dragEnd: [];
     }>();
 
     const conversationContainer = ref<HTMLElement | null>(null);
@@ -78,6 +88,7 @@
     const isAutoScrollEnabled = ref(true);
     const lastScrollTop = ref(0);
     const lastUserScrollIntentAt = ref(0);
+    const lastAutoScrollAt = ref(0);
     let messageListObserver: ResizeObserver | null = null;
 
     // 暴露 focus 方法
@@ -95,6 +106,26 @@
 
     function handleRegenerateMessage(messageId: string) {
         emit('regenerateMessage', messageId);
+    }
+
+    async function handleToolbarDragMouseDown(event: MouseEvent) {
+        if (event.button !== 0) {
+            return;
+        }
+
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('[data-drag-exclude="true"]')) {
+            return;
+        }
+
+        emit('dragStart');
+        try {
+            await getCurrentWindow().startDragging();
+        } finally {
+            setTimeout(() => {
+                emit('dragEnd');
+            }, 100);
+        }
     }
 
     function markUserScrollIntent() {
@@ -144,7 +175,8 @@
             if (hasScrollbar()) {
                 const userScrolledUp = currentScrollTop < lastScrollTop.value - 1;
                 const hasRecentUserIntent = Date.now() - lastUserScrollIntentAt.value < 280;
-                if (userScrolledUp && hasRecentUserIntent) {
+                const isLikelyProgrammaticScroll = Date.now() - lastAutoScrollAt.value < 180;
+                if (userScrolledUp && (hasRecentUserIntent || !isLikelyProgrammaticScroll)) {
                     isAutoScrollEnabled.value = false;
                     showScrollToBottom.value = true;
                 } else if (!isAutoScrollEnabled.value) {
@@ -158,6 +190,7 @@
 
     function syncToBottom() {
         if (!conversationContainer.value) return;
+        lastAutoScrollAt.value = Date.now();
         conversationContainer.value.scrollTop = conversationContainer.value.scrollHeight;
         lastScrollTop.value = conversationContainer.value.scrollTop;
     }
@@ -234,6 +267,10 @@
 
     .message-list {
         margin-top: 1rem;
+    }
+
+    .toolbar-fade-overlay {
+        background: linear-gradient(to bottom, var(--color-overlay-fade) 0%, transparent 100%);
     }
 
     .scroll-fade-overlay {

@@ -553,6 +553,8 @@
                 :is-pinned="isPinned"
                 @pin-change="(value: boolean) => (isPinned = value)"
                 @regenerate-message="handleRegenerateMessage"
+                @drag-start="isDragging = true"
+                @drag-end="isDragging = false"
             />
         </div>
         <div

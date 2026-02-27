@@ -3,8 +3,11 @@
 <template>
     <div class="flex items-center justify-end gap-1">
         <button
-            class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            class="pin-button flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
             aria-label="Pin conversation panel"
+            data-tauri-drag-region="false"
+            data-drag-exclude="true"
+            @mousedown.stop
             @click.stop="togglePinned"
         >
             <SvgIcon
