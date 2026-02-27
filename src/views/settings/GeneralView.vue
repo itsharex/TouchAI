@@ -1,24 +1,26 @@
 <script setup lang="ts">
     import AlertMessage from '@components/common/AlertMessage.vue';
+    import CustomSelect from '@components/common/CustomSelect.vue';
     import SvgIcon from '@components/common/SvgIcon.vue';
-    import { getSettingValue, setSetting } from '@database/queries';
     import { native } from '@services/NativeService';
     import { sendNotification } from '@tauri-apps/plugin-notification';
+    import { storeToRefs } from 'pinia';
     import { onMounted, onUnmounted, ref, watch } from 'vue';
 
-    interface GeneralSettingsData {
-        globalShortcut: string;
-        startOnBoot: boolean;
-        startMinimized: boolean;
-        mcpMaxIterations: number;
-    }
+    import { type OutputScrollBehavior, useSettingsStore } from '@/stores/settings';
 
-    const settings = ref<GeneralSettingsData>({
-        globalShortcut: 'Alt+Space',
-        startOnBoot: false,
-        startMinimized: true,
-        mcpMaxIterations: 10,
-    });
+    const settingsStore = useSettingsStore();
+    const { settings } = storeToRefs(settingsStore);
+
+    const outputScrollBehaviorOptions: Array<{
+        value: OutputScrollBehavior;
+        label: string;
+        description: string;
+    }> = [
+        { value: 'follow_output', label: '跟踪输出', description: '输出时自动滚动到最新内容' },
+        { value: 'stay_position', label: '保持原位', description: '输出时不改变当前滚动位置' },
+        { value: 'jump_to_top', label: '跳转到开头', description: '输出时自动跳到会话顶部' },
+    ];
 
     const shortcutInput = ref<HTMLInputElement | null>(null);
     const isSaving = ref(false);
@@ -189,16 +191,20 @@
         }
     });
 
-    // 从数据库加载设置
+    watch(
+        () => settings.value.globalShortcut,
+        (shortcut) => {
+            if (!isCapturing.value && !shortcutRegistrationFailed.value) {
+                displayShortcut.value = shortcut;
+            }
+        }
+    );
+
+    // 从 store 加载设置
     const loadSettings = async () => {
         try {
-            const shortcut = await getSettingValue({ key: 'global_shortcut' });
-            if (shortcut) {
-                settings.value.globalShortcut = shortcut;
-                displayShortcut.value = shortcut;
-            } else {
-                displayShortcut.value = settings.value.globalShortcut;
-            }
+            await settingsStore.initialize();
+            displayShortcut.value = settings.value.globalShortcut;
 
             // 检查快捷键注册状态
             const [failed, error] = await native.shortcut.getShortcutStatus();
@@ -207,21 +213,6 @@
                 pendingShortcut.value = settings.value.globalShortcut;
                 isInitialFailure.value = true; // 标记为初始化失败
                 console.warn('[GeneralView] Shortcut registration failed:', error);
-            }
-
-            const startOnBoot = await getSettingValue({ key: 'start_on_boot' });
-            if (startOnBoot) {
-                settings.value.startOnBoot = startOnBoot === 'true';
-            }
-
-            const startMinimized = await getSettingValue({ key: 'start_minimized' });
-            if (startMinimized) {
-                settings.value.startMinimized = startMinimized === 'true';
-            }
-
-            const mcpMaxIterations = await getSettingValue({ key: 'mcp_max_iterations' });
-            if (mcpMaxIterations) {
-                settings.value.mcpMaxIterations = parseInt(mcpMaxIterations, 10);
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
@@ -270,7 +261,7 @@
     // 保存快捷键到数据库并注册
     const saveShortcutToDatabase = async (shortcut: string) => {
         try {
-            await setSetting({ key: 'global_shortcut', value: shortcut });
+            await settingsStore.updateGlobalShortcut(shortcut);
         } catch (error) {
             console.error('Failed to save shortcut to database:', error);
             throw error;
@@ -279,16 +270,13 @@
 
     const saveStartOnBoot = async () => {
         try {
-            await setSetting({
-                key: 'start_on_boot',
-                value: settings.value.startOnBoot.toString(),
-            });
-
             if (settings.value.startOnBoot) {
                 await native.autostart.enableAutostart();
             } else {
                 await native.autostart.disableAutostart();
             }
+
+            await settingsStore.updateStartOnBoot(settings.value.startOnBoot);
         } catch (error) {
             console.error('Failed to save start_on_boot setting:', error);
             alertMessage.value?.error('保存开机自启动设置失败', 3000);
@@ -297,10 +285,7 @@
 
     const saveStartMinimized = async () => {
         try {
-            await setSetting({
-                key: 'start_minimized',
-                value: settings.value.startMinimized.toString(),
-            });
+            await settingsStore.updateStartMinimized(settings.value.startMinimized);
         } catch (error) {
             console.error('Failed to save start_minimized setting:', error);
             alertMessage.value?.error('保存设置失败', 3000);
@@ -316,13 +301,20 @@
                 settings.value.mcpMaxIterations = 50;
             }
 
-            await setSetting({
-                key: 'mcp_max_iterations',
-                value: settings.value.mcpMaxIterations.toString(),
-            });
+            await settingsStore.updateMcpMaxIterations(settings.value.mcpMaxIterations);
             alertMessage.value?.success('保存成功', 2000);
         } catch (error) {
             console.error('Failed to save mcp_max_iterations setting:', error);
+            alertMessage.value?.error('保存设置失败', 3000);
+        }
+    };
+
+    const saveOutputScrollBehavior = async () => {
+        try {
+            await settingsStore.updateOutputScrollBehavior(settings.value.outputScrollBehavior);
+            alertMessage.value?.success('保存成功', 2000);
+        } catch (error) {
+            console.error('Failed to save output_scroll_behavior setting:', error);
             alertMessage.value?.error('保存设置失败', 3000);
         }
     };
@@ -335,7 +327,7 @@
             const isEnabled = await native.autostart.isAutostartEnabled();
             if (isEnabled !== settings.value.startOnBoot) {
                 settings.value.startOnBoot = isEnabled;
-                await setSetting({ key: 'start_on_boot', value: isEnabled.toString() });
+                await settingsStore.updateStartOnBoot(isEnabled);
             }
         } catch (error) {
             console.error('Failed to check autostart status:', error);
@@ -510,8 +502,8 @@
             </div>
 
             <div class="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
-                <h2 class="font-serif text-lg font-semibold text-gray-900">AI 工具调用</h2>
-                <div class="space-y-4">
+                <h2 class="font-serif text-lg font-semibold text-gray-900">对话设置</h2>
+                <div class="space-y-5">
                     <div class="flex items-center justify-between">
                         <div class="flex-1">
                             <div class="font-serif text-sm font-medium text-gray-900">
@@ -531,6 +523,24 @@
                                 @blur="saveMcpMaxIterations"
                             />
                         </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block font-serif text-sm font-medium text-gray-700">
+                            输出时滚动策略
+                        </label>
+                        <CustomSelect
+                            v-model="settings.outputScrollBehavior"
+                            :options="outputScrollBehaviorOptions"
+                            @update:model-value="saveOutputScrollBehavior"
+                        />
+                        <p class="font-serif text-xs text-gray-500">
+                            {{
+                                outputScrollBehaviorOptions.find(
+                                    (option) => option.value === settings.outputScrollBehavior
+                                )?.description
+                            }}
+                        </p>
                     </div>
                 </div>
             </div>

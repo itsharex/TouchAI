@@ -73,8 +73,10 @@ export const eventService = new EventService();
 export type {
     AppEventMap,
     AppEventName,
+    GeneralSettingKey,
     McpServerStatus,
     McpStatusChangeEvent,
+    SettingsGeneralUpdatedEvent,
     WindowFocusEvent,
     WindowResizeEvent,
 } from './types';

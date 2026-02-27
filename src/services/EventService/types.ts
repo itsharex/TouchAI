@@ -16,6 +16,9 @@ export enum AppEvent {
     // MCP 事件
     MCP_STATUS = 'mcp:status',
 
+    // 设置事件
+    SETTINGS_GENERAL_UPDATED = 'settings:general-updated',
+
     // 窗口事件
     WINDOW_FOCUS = 'window:focus',
     WINDOW_RESIZE = 'window:resize',
@@ -29,6 +32,22 @@ export interface McpStatusChangeEvent {
     serverId: number;
     status: McpServerStatus;
     error?: string;
+}
+
+// ==================== 设置事件 ====================
+
+export type GeneralSettingKey =
+    | 'global_shortcut'
+    | 'start_on_boot'
+    | 'start_minimized'
+    | 'mcp_max_iterations'
+    | 'output_scroll_behavior';
+
+export interface SettingsGeneralUpdatedEvent {
+    sourceId: string;
+    windowLabel: string;
+    key: GeneralSettingKey;
+    value: string | number | boolean;
 }
 
 // ==================== 窗口事件 ====================
@@ -52,6 +71,9 @@ export interface WindowResizeEvent {
 export interface AppEventMap {
     // MCP 事件
     [AppEvent.MCP_STATUS]: McpStatusChangeEvent;
+
+    // 设置事件
+    [AppEvent.SETTINGS_GENERAL_UPDATED]: SettingsGeneralUpdatedEvent;
 
     // 窗口事件
     [AppEvent.WINDOW_FOCUS]: WindowFocusEvent;

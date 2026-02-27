@@ -6,7 +6,6 @@
     import { useAgent } from '@composables/useAgent.ts';
     import { useAlert } from '@composables/useAlert';
     import { useWindowResize } from '@composables/useWindowResize';
-    import { getSettingValue, setSetting } from '@database/queries';
     import {
         type AttachmentSupportStatus,
         createAttachment,
@@ -22,7 +21,8 @@
     import { readClipboard, ReadClipboardItem } from 'tauri-plugin-clipboard-x-api';
     import { computed, nextTick, onMounted, onUnmounted, ref, unref } from 'vue';
 
-    const DEFAULT_GLOBAL_SHORTCUT = 'Alt+Space';
+    import { useSettingsStore } from '@/stores/settings';
+
     const WINDOW_MAX_HEIGHT = 700;
 
     const searchQuery = ref('');
@@ -50,6 +50,7 @@
     let unlistenFocus: (() => void) | null = null;
     let unlistenBlur: (() => void) | null = null;
     let unlistenPopupFocusMain: (() => void) | null = null;
+    const settingsStore = useSettingsStore();
 
     const { isLoading, error, conversationHistory, sendRequest, cancel, clearConversation } =
         useAgent({
@@ -448,14 +449,8 @@
      */
     async function initializeGlobalShortcut() {
         try {
-            const storedShortcut = await getSettingValue({ key: 'global_shortcut' });
-            const shortcut = storedShortcut || DEFAULT_GLOBAL_SHORTCUT;
-
-            if (!storedShortcut) {
-                await setSetting({ key: 'global_shortcut', value: DEFAULT_GLOBAL_SHORTCUT });
-            }
-
-            await native.shortcut.registerGlobalShortcut(shortcut);
+            await settingsStore.initialize();
+            await native.shortcut.registerGlobalShortcut(settingsStore.globalShortcut);
         } catch (error) {
             console.error('[SearchView] Failed to initialize global shortcut:', error);
 

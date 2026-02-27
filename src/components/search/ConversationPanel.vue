@@ -26,13 +26,18 @@
         >
             <!-- 消息列表 -->
             <div ref="messageListRef" class="message-list">
-                <MessageItem
+                <div
                     v-for="(message, index) in messages"
                     :key="message.id"
-                    :message="message"
-                    :previous-message="index > 0 ? messages[index - 1] : undefined"
-                    @regenerate="handleRegenerateMessage"
-                />
+                    :data-message-id="message.id"
+                    :data-message-role="message.role"
+                >
+                    <MessageItem
+                        :message="message"
+                        :previous-message="index > 0 ? messages[index - 1] : undefined"
+                        @regenerate="handleRegenerateMessage"
+                    />
+                </div>
             </div>
         </div>
 
@@ -58,7 +63,10 @@
     import type { ConversationMessage } from '@composables/useAgent.ts';
     import { useScrollbarStabilizer } from '@composables/useScrollbarStabilizer';
     import { getCurrentWindow } from '@tauri-apps/api/window';
+    import { storeToRefs } from 'pinia';
     import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+
+    import { useSettingsStore } from '@/stores/settings';
 
     interface Props {
         messages: ConversationMessage[];
@@ -82,6 +90,8 @@
 
     const conversationContainer = ref<HTMLElement | null>(null);
     const messageListRef = ref<HTMLElement | null>(null);
+    const settingsStore = useSettingsStore();
+    const { outputScrollBehavior } = storeToRefs(settingsStore);
     useScrollbarStabilizer(conversationContainer);
     const isPinned = computed(() => props.isPinned);
     const showScrollToBottom = ref(false);
@@ -89,6 +99,7 @@
     const lastScrollTop = ref(0);
     const lastUserScrollIntentAt = ref(0);
     const lastAutoScrollAt = ref(0);
+    const USER_MESSAGE_SCROLL_GAP = 12;
     let messageListObserver: ResizeObserver | null = null;
 
     // 暴露 focus 方法
@@ -106,6 +117,10 @@
 
     function handleRegenerateMessage(messageId: string) {
         emit('regenerateMessage', messageId);
+    }
+
+    function shouldAutoScrollOnOutput(): boolean {
+        return outputScrollBehavior.value === 'follow_output' && isAutoScrollEnabled.value;
     }
 
     async function handleToolbarDragMouseDown(event: MouseEvent) {
@@ -165,24 +180,30 @@
         const container = conversationContainer.value;
         const currentScrollTop = container.scrollTop;
         const atBottom = isScrolledToBottom(container);
+        const mode = outputScrollBehavior.value;
 
-        // 如果用户滚动到底部，恢复自动滚动并隐藏按钮
-        if (atBottom) {
-            isAutoScrollEnabled.value = true;
-            showScrollToBottom.value = false;
-        } else {
-            // 仅在真实“向上滚动”时禁用自动滚动，避免内容高度变化误触发
-            if (hasScrollbar()) {
-                const userScrolledUp = currentScrollTop < lastScrollTop.value - 1;
-                const hasRecentUserIntent = Date.now() - lastUserScrollIntentAt.value < 280;
-                const isLikelyProgrammaticScroll = Date.now() - lastAutoScrollAt.value < 180;
-                if (userScrolledUp && (hasRecentUserIntent || !isLikelyProgrammaticScroll)) {
-                    isAutoScrollEnabled.value = false;
-                    showScrollToBottom.value = true;
-                } else if (!isAutoScrollEnabled.value) {
-                    showScrollToBottom.value = true;
+        if (mode === 'follow_output') {
+            // 如果用户滚动到底部，恢复自动滚动并隐藏按钮
+            if (atBottom) {
+                isAutoScrollEnabled.value = true;
+                showScrollToBottom.value = false;
+            } else {
+                // 仅在真实“向上滚动”时禁用自动滚动，避免内容高度变化误触发
+                if (hasScrollbar()) {
+                    const userScrolledUp = currentScrollTop < lastScrollTop.value - 1;
+                    const hasRecentUserIntent = Date.now() - lastUserScrollIntentAt.value < 280;
+                    const isLikelyProgrammaticScroll = Date.now() - lastAutoScrollAt.value < 180;
+                    if (userScrolledUp && (hasRecentUserIntent || !isLikelyProgrammaticScroll)) {
+                        isAutoScrollEnabled.value = false;
+                        showScrollToBottom.value = true;
+                    } else if (!isAutoScrollEnabled.value) {
+                        showScrollToBottom.value = true;
+                    }
                 }
             }
+        } else {
+            isAutoScrollEnabled.value = false;
+            showScrollToBottom.value = hasScrollbar() && !atBottom;
         }
 
         lastScrollTop.value = currentScrollTop;
@@ -195,10 +216,36 @@
         lastScrollTop.value = conversationContainer.value.scrollTop;
     }
 
+    function scrollToUserMessageTop(messageId: string, gap = USER_MESSAGE_SCROLL_GAP): boolean {
+        if (!conversationContainer.value || !messageListRef.value) {
+            return false;
+        }
+
+        const escapedMessageId =
+            typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+                ? CSS.escape(messageId)
+                : messageId;
+        const selector = `[data-message-id="${escapedMessageId}"]`;
+        const target = messageListRef.value.querySelector<HTMLElement>(selector);
+        if (!target) {
+            return false;
+        }
+
+        const container = conversationContainer.value;
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const targetScrollTop = container.scrollTop + (targetRect.top - containerRect.top) - gap;
+
+        lastAutoScrollAt.value = Date.now();
+        container.scrollTop = Math.max(0, targetScrollTop);
+        lastScrollTop.value = container.scrollTop;
+        return true;
+    }
+
     // 滚动到底部
     function scrollToBottom() {
         syncToBottom();
-        isAutoScrollEnabled.value = true;
+        isAutoScrollEnabled.value = outputScrollBehavior.value === 'follow_output';
         showScrollToBottom.value = false;
     }
 
@@ -206,7 +253,7 @@
     watch(
         () => props.messages,
         async () => {
-            if (!isAutoScrollEnabled.value) return;
+            if (!shouldAutoScrollOnOutput()) return;
 
             await nextTick();
             syncToBottom();
@@ -220,26 +267,64 @@
         (newLength, oldLength) => {
             // 消息被清空（新请求开始）
             if (newLength === 0 && oldLength > 0) {
-                isAutoScrollEnabled.value = true;
+                isAutoScrollEnabled.value = outputScrollBehavior.value === 'follow_output';
                 showScrollToBottom.value = false;
                 lastScrollTop.value = 0;
             }
             // 新消息添加（用户提交了新请求）
             if (newLength > oldLength) {
-                // 启用自动滚动并滚动到底部
-                isAutoScrollEnabled.value = true;
-                showScrollToBottom.value = false;
-                nextTick(() => {
-                    syncToBottom();
-                });
+                const appendedMessages = props.messages.slice(oldLength, newLength);
+                const latestAppendedUserMessage = [...appendedMessages]
+                    .reverse()
+                    .find((message) => message.role === 'user');
+
+                if (outputScrollBehavior.value === 'follow_output') {
+                    // 新请求时重置为跟踪模式
+                    isAutoScrollEnabled.value = true;
+                    showScrollToBottom.value = false;
+                    nextTick(() => {
+                        syncToBottom();
+                    });
+                } else if (outputScrollBehavior.value === 'jump_to_top') {
+                    isAutoScrollEnabled.value = false;
+                    nextTick(() => {
+                        if (latestAppendedUserMessage) {
+                            scrollToUserMessageTop(latestAppendedUserMessage.id);
+                        }
+                        const atBottom = isScrolledToBottom(conversationContainer.value);
+                        showScrollToBottom.value = hasScrollbar() && !atBottom;
+                    });
+                } else {
+                    isAutoScrollEnabled.value = false;
+                    const atBottom = isScrolledToBottom(conversationContainer.value);
+                    showScrollToBottom.value = hasScrollbar() && !atBottom;
+                }
             }
         }
     );
 
-    onMounted(() => {
+    watch(
+        outputScrollBehavior,
+        async (mode) => {
+            isAutoScrollEnabled.value = mode === 'follow_output';
+
+            if (!conversationContainer.value) {
+                showScrollToBottom.value = false;
+                return;
+            }
+
+            await nextTick();
+            const atBottom = isScrolledToBottom(conversationContainer.value);
+            showScrollToBottom.value = hasScrollbar() && !atBottom;
+        },
+        { immediate: true }
+    );
+
+    onMounted(async () => {
+        await settingsStore.initialize();
         if (messageListRef.value) {
             messageListObserver = new ResizeObserver(() => {
-                if (!isAutoScrollEnabled.value) {
+                if (!shouldAutoScrollOnOutput()) {
                     return;
                 }
 

@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = [
     { key: SettingKey.LANGUAGE, value: 'zh-CN' },
     { key: SettingKey.AUTO_START, value: 'false' },
     { key: SettingKey.MCP_MAX_ITERATIONS, value: '10' },
+    { key: SettingKey.OUTPUT_SCROLL_BEHAVIOR, value: 'follow_output' },
 ];
 
 /**

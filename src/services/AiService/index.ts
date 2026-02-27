@@ -8,11 +8,11 @@ import {
     updateModelLastUsed,
 } from '@database/queries';
 import type { ModelWithProvider } from '@database/queries/models';
-import { getSettingValue } from '@database/queries/settings';
 import type { ProviderType } from '@database/schema';
-import { SettingKey } from '@database/schema';
 import type { AiRequestEntity } from '@database/types';
 import type { Index } from '@services/AiService/attachments';
+
+import { useSettingsStore } from '@/stores/settings';
 
 import { AiError, AiErrorCode } from './errors';
 import { mcpManager } from './mcp';
@@ -179,8 +179,9 @@ export class AiServiceManager {
 
         try {
             // 6. 从设置中获取最大迭代次数
-            const maxIterationsStr = await getSettingValue({ key: SettingKey.MCP_MAX_ITERATIONS });
-            const maxIterations = maxIterationsStr ? parseInt(maxIterationsStr, 10) : 10;
+            const settingsStore = useSettingsStore();
+            await settingsStore.initialize();
+            const maxIterations = settingsStore.mcpMaxIterations;
 
             // 7. 如果模型支持工具调用，获取工具列表
             let tools: AiToolDefinition[] | undefined;

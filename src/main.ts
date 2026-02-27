@@ -13,6 +13,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import { useMcpStore } from './stores/mcp';
+import { useSettingsStore } from './stores/settings';
 
 function isInternalLink(url: string): boolean {
     if (!url || url === '#' || url.startsWith('#')) {
@@ -113,7 +114,8 @@ async function initializeApp() {
 
     if (['main', 'settings'].includes(windowLabel)) {
         const mcpStore = useMcpStore();
-        await mcpStore.initialize();
+        const settingsStore = useSettingsStore();
+        await Promise.all([mcpStore.initialize(), settingsStore.initialize()]);
     }
 }
 
