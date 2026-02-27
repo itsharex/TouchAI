@@ -91,7 +91,6 @@
 
     const searchQuery = ref('');
     const searchInput = ref<HTMLInputElement | null>(null);
-    const containerRef = ref<HTMLElement | null>(null);
     const logoContainerRef = ref<HTMLElement | null>(null);
 
     // Popup window integration
